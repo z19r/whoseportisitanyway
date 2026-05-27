@@ -227,6 +227,244 @@ pub fn wild_dim(row: usize) -> Color {
     wild_color(row * 5 + 60)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hue_to_rgb_red() {
+        let Color::Rgb(r, g, b) = hue_to_rgb(0.0) else { panic!() };
+        assert_eq!(r, 255);
+        assert_eq!(g, 0);
+        assert_eq!(b, 0);
+    }
+
+    #[test]
+    fn hue_to_rgb_green() {
+        let Color::Rgb(r, g, b) = hue_to_rgb(120.0) else { panic!() };
+        assert_eq!(r, 0);
+        assert_eq!(g, 255);
+        assert_eq!(b, 0);
+    }
+
+    #[test]
+    fn hue_to_rgb_blue() {
+        let Color::Rgb(r, g, b) = hue_to_rgb(240.0) else { panic!() };
+        assert_eq!(r, 0);
+        assert_eq!(g, 0);
+        assert_eq!(b, 255);
+    }
+
+    #[test]
+    fn hue_to_rgb_wraps_negative() {
+        let a = hue_to_rgb(-60.0);
+        let b = hue_to_rgb(300.0);
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn hue_to_rgb_wraps_over_360() {
+        let a = hue_to_rgb(420.0);
+        let b = hue_to_rgb(60.0);
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn classification_color_all_variants() {
+        let variants = [
+            Classification::DevServer,
+            Classification::Database,
+            Classification::Docker,
+            Classification::BuildTool,
+            Classification::LanguageServer,
+            Classification::Proxy,
+            Classification::Browser,
+            Classification::MessageQueue,
+            Classification::SshTunnel,
+            Classification::System,
+            Classification::Unknown,
+        ];
+        for v in &variants {
+            let c = classification_color(v);
+            assert!(matches!(c, Color::Rgb(_, _, _)));
+        }
+    }
+
+    #[test]
+    fn classification_color_devserver_is_green() {
+        let Color::Rgb(r, g, b) = classification_color(&Classification::DevServer) else { panic!() };
+        assert!(g > r && g > b);
+    }
+
+    #[test]
+    fn classification_color_wild_returns_color() {
+        let c = classification_color_wild(&Classification::Docker, 3);
+        assert!(matches!(c, Color::Rgb(_, _, _)));
+    }
+
+    #[test]
+    fn ownership_style_owned_is_bold_green() {
+        let s = ownership_style(&Ownership::Owned);
+        assert!(s.add_modifier.contains(Modifier::BOLD));
+    }
+
+    #[test]
+    fn ownership_style_blocked_is_bold() {
+        let s = ownership_style(&Ownership::Blocked);
+        assert!(s.add_modifier.contains(Modifier::BOLD));
+    }
+
+    #[test]
+    fn ownership_style_untracked_not_bold() {
+        let s = ownership_style(&Ownership::Untracked);
+        assert!(!s.add_modifier.contains(Modifier::BOLD));
+    }
+
+    #[test]
+    fn ownership_style_wild_no_panic() {
+        let _ = ownership_style_wild(&Ownership::Owned, 0);
+        let _ = ownership_style_wild(&Ownership::Blocked, 5);
+        let _ = ownership_style_wild(&Ownership::Untracked, 10);
+    }
+
+    #[test]
+    fn state_color_listen_is_yellow() {
+        let Color::Rgb(r, g, _) = state_color(&PortState::Listen) else { panic!() };
+        assert!(r > 200 && g > 200);
+    }
+
+    #[test]
+    fn state_color_established_is_dim() {
+        let Color::Rgb(r, _, _) = state_color(&PortState::Established) else { panic!() };
+        assert!(r < 150);
+    }
+
+    #[test]
+    fn state_color_wild_no_panic() {
+        let _ = state_color_wild(&PortState::Listen, 0);
+        let _ = state_color_wild(&PortState::Established, 5);
+    }
+
+    #[test]
+    fn port_color_privileged() {
+        let Color::Rgb(r, _, _) = port_color(80) else { panic!() };
+        assert_eq!(r, 255);
+    }
+
+    #[test]
+    fn port_color_common() {
+        let Color::Rgb(_, g, _) = port_color(3000) else { panic!() };
+        assert_eq!(g, 140);
+    }
+
+    #[test]
+    fn port_color_high() {
+        let Color::Rgb(_, g, _) = port_color(9000) else { panic!() };
+        assert_eq!(g, 200);
+    }
+
+    #[test]
+    fn port_color_ephemeral() {
+        let Color::Rgb(r, g, _) = port_color(50000) else { panic!() };
+        assert_eq!(r, 160);
+        assert_eq!(g, 160);
+    }
+
+    #[test]
+    fn port_color_boundary_1023() {
+        assert_eq!(port_color(1023), Color::Rgb(255, 100, 100));
+    }
+
+    #[test]
+    fn port_color_boundary_1024() {
+        assert_eq!(port_color(1024), Color::Rgb(180, 140, 255));
+    }
+
+    #[test]
+    fn port_color_boundary_49151() {
+        assert_eq!(port_color(49151), Color::Rgb(100, 200, 255));
+    }
+
+    #[test]
+    fn port_color_boundary_49152() {
+        assert_eq!(port_color(49152), Color::Rgb(160, 160, 180));
+    }
+
+    #[test]
+    fn port_color_wild_no_panic() {
+        let _ = port_color_wild(3000, 0);
+        let _ = port_color_wild(80, 10);
+    }
+
+    #[test]
+    fn plain_title_single_span() {
+        let spans = plain_title();
+        assert_eq!(spans.len(), 1);
+        assert_eq!(spans[0].content, "whoseportisitanyway");
+    }
+
+    #[test]
+    fn rainbow_title_has_19_spans() {
+        let spans = rainbow_title();
+        assert_eq!(spans.len(), 19);
+    }
+
+    #[test]
+    fn rainbow_title_uses_gradient_colors() {
+        let spans = rainbow_title();
+        assert_eq!(
+            spans[0].style.fg,
+            Some(TITLE_GRADIENT[0])
+        );
+    }
+
+    #[test]
+    fn wild_title_has_19_spans() {
+        let spans = wild_title();
+        assert_eq!(spans.len(), 19);
+    }
+
+    #[test]
+    fn wild_bg_returns_rgb() {
+        assert!(matches!(wild_bg(), Color::Rgb(_, _, _)));
+    }
+
+    #[test]
+    fn wild_border_returns_rgb() {
+        assert!(matches!(wild_border(), Color::Rgb(_, _, _)));
+    }
+
+    #[test]
+    fn wild_header_bg_returns_rgb() {
+        assert!(matches!(wild_header_bg(), Color::Rgb(_, _, _)));
+    }
+
+    #[test]
+    fn wild_dim_returns_rgb() {
+        assert!(matches!(wild_dim(0), Color::Rgb(_, _, _)));
+    }
+
+    #[test]
+    fn wild_selected_bg_returns_rgb() {
+        assert!(matches!(wild_selected_bg(), Color::Rgb(_, _, _)));
+    }
+
+    #[test]
+    fn title_gradient_has_7_colors() {
+        assert_eq!(TITLE_GRADIENT.len(), 7);
+    }
+
+    #[test]
+    fn constants_are_correct() {
+        assert_eq!(HEADER_BG, Color::Rgb(30, 15, 60));
+        assert_eq!(HEADER_FG, Color::Rgb(200, 160, 255));
+        assert_eq!(BORDER_COLOR, Color::Rgb(100, 60, 180));
+        assert_eq!(SELECTED_BG, Color::Rgb(60, 30, 120));
+        assert_eq!(SELECTED_FG, Color::White);
+        assert_eq!(DIM, Color::Rgb(100, 90, 120));
+    }
+}
+
 pub fn wild_selected_bg() -> Color {
     let t = tick() / 80;
     let hue = (t % 360) as f64;

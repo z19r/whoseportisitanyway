@@ -320,11 +320,18 @@ mod tests {
     fn parse_state_other_returns_none() {
         assert_eq!(parse_state("06"), None);
         assert_eq!(parse_state("02"), None);
+        assert_eq!(parse_state("FF"), None);
+        assert_eq!(parse_state("00"), None);
+    }
+
+    #[test]
+    fn parse_state_lowercase_ignored() {
+        assert_eq!(parse_state("0a"), None);
+        assert_eq!(parse_state("01"), Some(PortState::Established));
     }
 
     #[test]
     fn parse_ipv4_loopback_port_3000() {
-        // 0100007F = 127.0.0.1 in little-endian, 0BB8 = 3000
         let (addr, port) = parse_addr_v4("0100007F:0BB8").unwrap();
         assert_eq!(addr, "127.0.0.1");
         assert_eq!(port, 3000);
@@ -332,24 +339,62 @@ mod tests {
 
     #[test]
     fn parse_ipv4_any_port_8080() {
-        // 00000000 = 0.0.0.0, 1F90 = 8080
         let (addr, port) = parse_addr_v4("00000000:1F90").unwrap();
         assert_eq!(addr, "0.0.0.0");
         assert_eq!(port, 8080);
     }
 
     #[test]
+    fn parse_ipv4_port_22() {
+        let (addr, port) = parse_addr_v4("00000000:0016").unwrap();
+        assert_eq!(addr, "0.0.0.0");
+        assert_eq!(port, 22);
+    }
+
+    #[test]
+    fn parse_ipv4_port_443() {
+        let (addr, port) = parse_addr_v4("00000000:01BB").unwrap();
+        assert_eq!(addr, "0.0.0.0");
+        assert_eq!(port, 443);
+    }
+
+    #[test]
+    fn parse_ipv4_specific_addr() {
+        let (addr, port) = parse_addr_v4("0100000A:0050").unwrap();
+        assert_eq!(addr, "10.0.0.1");
+        assert_eq!(port, 80);
+    }
+
+    #[test]
     fn parse_ipv6_any_port_443() {
-        // 32 zeros = ::, 01BB = 443
         let (addr, port) = parse_addr_v6("00000000000000000000000000000000:01BB").unwrap();
         assert_eq!(addr, "::");
         assert_eq!(port, 443);
     }
 
     #[test]
+    fn parse_ipv6_loopback() {
+        let (addr, port) = parse_addr_v6("00000000000000000000000001000000:0050").unwrap();
+        assert_eq!(port, 80);
+        assert!(!addr.is_empty());
+    }
+
+    #[test]
     fn format_ipv6_unspecified() {
-        let ip = Ipv6Addr::UNSPECIFIED;
-        assert_eq!(format_ipv6(&ip), "::");
+        assert_eq!(format_ipv6(&Ipv6Addr::UNSPECIFIED), "::");
+    }
+
+    #[test]
+    fn format_ipv6_mapped_v4() {
+        let ip = Ipv6Addr::new(0, 0, 0, 0, 0, 0xffff, 0x7f00, 0x0001);
+        assert_eq!(format_ipv6(&ip), "127.0.0.1");
+    }
+
+    #[test]
+    fn format_ipv6_regular() {
+        let ip = Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1);
+        let s = format_ipv6(&ip);
+        assert!(s.contains("2001"));
     }
 
     #[test]
@@ -358,7 +403,148 @@ mod tests {
     }
 
     #[test]
+    fn parse_addr_v4_invalid_hex() {
+        assert!(parse_addr_v4("ZZZZZZZZ:0050").is_err());
+    }
+
+    #[test]
+    fn parse_addr_v4_invalid_port_hex() {
+        assert!(parse_addr_v4("00000000:ZZZZ").is_err());
+    }
+
+    #[test]
     fn parse_addr_v6_wrong_length() {
         assert!(parse_addr_v6("ABCD:01BB").is_err());
+    }
+
+    #[test]
+    fn parse_addr_v6_invalid_word() {
+        assert!(parse_addr_v6("ZZZZZZZZ000000000000000000000000:0050").is_err());
+    }
+
+    #[test]
+    fn well_known_hint_ssh() {
+        assert_eq!(well_known_hint(22), Some("sshd"));
+    }
+
+    #[test]
+    fn well_known_hint_http() {
+        assert_eq!(well_known_hint(80), Some("httpd"));
+    }
+
+    #[test]
+    fn well_known_hint_https() {
+        assert_eq!(well_known_hint(443), Some("https"));
+    }
+
+    #[test]
+    fn well_known_hint_smtp_variants() {
+        assert_eq!(well_known_hint(25), Some("smtp"));
+        assert_eq!(well_known_hint(465), Some("smtp"));
+        assert_eq!(well_known_hint(587), Some("smtp"));
+    }
+
+    #[test]
+    fn well_known_hint_databases() {
+        assert_eq!(well_known_hint(3306), Some("mysql"));
+        assert_eq!(well_known_hint(5432), Some("postgres"));
+        assert_eq!(well_known_hint(27017), Some("mongodb"));
+        assert_eq!(well_known_hint(1433), Some("mssql"));
+    }
+
+    #[test]
+    fn well_known_hint_redis() {
+        assert_eq!(well_known_hint(6379), Some("redis"));
+        assert_eq!(well_known_hint(6380), Some("redis"));
+    }
+
+    #[test]
+    fn well_known_hint_rabbitmq() {
+        assert_eq!(well_known_hint(5672), Some("rabbitmq"));
+        assert_eq!(well_known_hint(5671), Some("rabbitmq"));
+        assert_eq!(well_known_hint(15672), Some("rabbitmq-mgmt"));
+    }
+
+    #[test]
+    fn well_known_hint_misc() {
+        assert_eq!(well_known_hint(53), Some("dns"));
+        assert_eq!(well_known_hint(631), Some("cupsd"));
+        assert_eq!(well_known_hint(6333), Some("qdrant"));
+        assert_eq!(well_known_hint(9090), Some("prometheus"));
+        assert_eq!(well_known_hint(9200), Some("elasticsearch"));
+        assert_eq!(well_known_hint(9300), Some("elasticsearch"));
+        assert_eq!(well_known_hint(11211), Some("memcached"));
+    }
+
+    #[test]
+    fn well_known_hint_unknown_port() {
+        assert_eq!(well_known_hint(12345), None);
+        assert_eq!(well_known_hint(0), None);
+        assert_eq!(well_known_hint(65535), None);
+    }
+
+    #[test]
+    fn parse_proc_net_empty_content() {
+        let inode_pids = HashMap::new();
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("tcp");
+        std::fs::write(&path, "  sl  local_address ...\n").unwrap();
+        let result = parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids);
+        assert!(result.unwrap().is_empty());
+    }
+
+    #[test]
+    fn parse_proc_net_missing_file() {
+        let inode_pids = HashMap::new();
+        let result = parse_proc_net("/nonexistent/path", Protocol::Tcp, false, &inode_pids);
+        assert!(result.unwrap().is_empty());
+    }
+
+    #[test]
+    fn parse_proc_net_short_fields_skipped() {
+        let inode_pids = HashMap::new();
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("tcp");
+        std::fs::write(&path, "header\nshort line\n").unwrap();
+        let result = parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids);
+        assert!(result.unwrap().is_empty());
+    }
+
+    #[test]
+    fn parse_proc_net_valid_line() {
+        let inode_pids = HashMap::new();
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("tcp");
+        let line = "   0: 00000000:1F90 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 12345 1 0000000000000000 100 0 0 10 0";
+        std::fs::write(&path, format!("  sl  local_address ...\n{}\n", line)).unwrap();
+        let result = parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].port, 8080);
+        assert_eq!(result[0].state, PortState::Listen);
+    }
+
+    #[test]
+    fn parse_proc_net_skips_port_zero() {
+        let inode_pids = HashMap::new();
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("tcp");
+        let line = "   0: 00000000:0000 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 12345 1 0000000000000000 100 0 0 10 0";
+        std::fs::write(&path, format!("header\n{}\n", line)).unwrap();
+        let result = parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn parse_proc_net_resolves_inode_to_pid() {
+        let mut inode_pids = HashMap::new();
+        inode_pids.insert("99999".to_string(), 42);
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("tcp");
+        let line = "   0: 00000000:0050 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 99999 1 0000000000000000 100 0 0 10 0";
+        std::fs::write(&path, format!("header\n{}\n", line)).unwrap();
+        let result = parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].pid, 42);
+        assert_eq!(result[0].port, 80);
     }
 }

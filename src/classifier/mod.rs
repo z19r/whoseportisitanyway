@@ -364,3 +364,515 @@ fn process_cwd(_pid: u32) -> Option<std::path::PathBuf> {
 fn process_cwd(_pid: u32) -> Option<std::path::PathBuf> {
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::{PortState, Protocol};
+
+    fn raw(name: &str, cmd: &str) -> RawPort {
+        RawPort {
+            port: 3000,
+            protocol: Protocol::Tcp,
+            pid: 100,
+            process_name: name.to_string(),
+            command_line: cmd.to_string(),
+            state: PortState::Listen,
+            local_addr: "127.0.0.1:3000".to_string(),
+            parent_pid: None,
+            parent_command_line: None,
+            cwd: None,
+        }
+    }
+
+    fn raw_with_pid(name: &str, cmd: &str, pid: u32) -> RawPort {
+        RawPort {
+            pid,
+            ..raw(name, cmd)
+        }
+    }
+
+    // --- is_docker ---
+
+    #[test]
+    fn classifies_docker_proxy() {
+        assert!(is_docker(&raw("docker-proxy", "")));
+    }
+
+    #[test]
+    fn classifies_com_docker() {
+        assert!(is_docker(&raw("com.docker.backend", "")));
+    }
+
+    #[test]
+    fn classifies_containerd() {
+        assert!(is_docker(&raw("containerd", "")));
+    }
+
+    #[test]
+    fn classifies_dockerd() {
+        assert!(is_docker(&raw("dockerd", "")));
+    }
+
+    #[test]
+    fn classifies_podman() {
+        assert!(is_docker(&raw("podman", "")));
+    }
+
+    #[test]
+    fn classifies_docker_in_cmdline() {
+        assert!(is_docker(&raw("runc", "docker run nginx")));
+    }
+
+    #[test]
+    fn not_docker_for_node() {
+        assert!(!is_docker(&raw("node", "node server.js")));
+    }
+
+    // --- is_ssh_tunnel ---
+
+    #[test]
+    fn classifies_ssh_local_forward() {
+        assert!(is_ssh_tunnel(&raw("ssh", "ssh -L 3000:localhost:3000 remote")));
+    }
+
+    #[test]
+    fn classifies_ssh_remote_forward() {
+        assert!(is_ssh_tunnel(&raw("ssh", "ssh -R 3000:localhost:3000 remote")));
+    }
+
+    #[test]
+    fn classifies_ssh_dynamic_forward() {
+        assert!(is_ssh_tunnel(&raw("ssh", "ssh -D 1080 remote")));
+    }
+
+    #[test]
+    fn not_ssh_tunnel_without_flags() {
+        assert!(!is_ssh_tunnel(&raw("ssh", "ssh user@host")));
+    }
+
+    #[test]
+    fn not_ssh_tunnel_if_not_ssh_process() {
+        assert!(!is_ssh_tunnel(&raw("node", "ssh -L 3000:localhost:3000")));
+    }
+
+    // --- is_system ---
+
+    #[test]
+    fn classifies_pid_0_as_system() {
+        assert!(is_system(&raw_with_pid("kernel", "", 0)));
+    }
+
+    #[test]
+    fn classifies_pid_1_as_system() {
+        assert!(is_system(&raw_with_pid("systemd", "", 1)));
+    }
+
+    #[test]
+    fn classifies_systemd_resolve() {
+        assert!(is_system(&raw("systemd-resolve", "")));
+    }
+
+    #[test]
+    fn classifies_sshd() {
+        assert!(is_system(&raw("sshd", "")));
+    }
+
+    #[test]
+    fn classifies_cupsd() {
+        assert!(is_system(&raw("cupsd", "")));
+    }
+
+    #[test]
+    fn classifies_network_manager() {
+        assert!(is_system(&raw("NetworkManager", "")));
+    }
+
+    #[test]
+    fn classifies_pipewire() {
+        assert!(is_system(&raw("pipewire", "")));
+    }
+
+    #[test]
+    fn not_system_for_node() {
+        assert!(!is_system(&raw("node", "")));
+    }
+
+    // --- is_browser ---
+
+    #[test]
+    fn classifies_chrome() {
+        assert!(is_browser(&raw("chrome", "")));
+    }
+
+    #[test]
+    fn classifies_firefox() {
+        assert!(is_browser(&raw("firefox", "")));
+    }
+
+    #[test]
+    fn classifies_electron() {
+        assert!(is_browser(&raw("electron", "")));
+    }
+
+    #[test]
+    fn classifies_brave() {
+        assert!(is_browser(&raw("brave", "")));
+    }
+
+    #[test]
+    fn not_browser_for_node() {
+        assert!(!is_browser(&raw("node", "")));
+    }
+
+    // --- is_database ---
+
+    #[test]
+    fn classifies_postgres() {
+        assert!(is_database(&raw("postgres", "")));
+    }
+
+    #[test]
+    fn classifies_mysqld() {
+        assert!(is_database(&raw("mysqld", "")));
+    }
+
+    #[test]
+    fn classifies_redis_server() {
+        assert!(is_database(&raw("redis-server", "")));
+    }
+
+    #[test]
+    fn classifies_mongod() {
+        assert!(is_database(&raw("mongod", "")));
+    }
+
+    #[test]
+    fn classifies_clickhouse() {
+        assert!(is_database(&raw("clickhouse", "")));
+    }
+
+    #[test]
+    fn classifies_influxd() {
+        assert!(is_database(&raw("influxd", "")));
+    }
+
+    #[test]
+    fn classifies_etcd() {
+        assert!(is_database(&raw("etcd", "")));
+    }
+
+    #[test]
+    fn classifies_surrealdb() {
+        assert!(is_database(&raw("surrealdb", "")));
+    }
+
+    #[test]
+    fn not_database_for_node() {
+        assert!(!is_database(&raw("node", "")));
+    }
+
+    // --- is_message_queue ---
+
+    #[test]
+    fn classifies_rabbitmq_process() {
+        assert!(is_message_queue(&raw("rabbitmq", "")));
+    }
+
+    #[test]
+    fn classifies_beam_smp() {
+        assert!(is_message_queue(&raw("beam.smp", "")));
+    }
+
+    #[test]
+    fn classifies_kafka_in_cmd() {
+        assert!(is_message_queue(&raw("java", "kafka.Kafka config.properties")));
+    }
+
+    #[test]
+    fn classifies_nats_server_in_cmd() {
+        assert!(is_message_queue(&raw("unknown", "nats-server --port 4222")));
+    }
+
+    #[test]
+    fn not_message_queue_for_node() {
+        assert!(!is_message_queue(&raw("node", "node app.js")));
+    }
+
+    // --- is_proxy ---
+
+    #[test]
+    fn classifies_nginx() {
+        assert!(is_proxy(&raw("nginx", "")));
+    }
+
+    #[test]
+    fn classifies_caddy() {
+        assert!(is_proxy(&raw("caddy", "")));
+    }
+
+    #[test]
+    fn classifies_traefik() {
+        assert!(is_proxy(&raw("traefik", "")));
+    }
+
+    #[test]
+    fn classifies_haproxy() {
+        assert!(is_proxy(&raw("haproxy", "")));
+    }
+
+    #[test]
+    fn classifies_apache2() {
+        assert!(is_proxy(&raw("apache2", "")));
+    }
+
+    #[test]
+    fn not_proxy_for_node() {
+        assert!(!is_proxy(&raw("node", "")));
+    }
+
+    // --- is_language_server ---
+
+    #[test]
+    fn classifies_rust_analyzer() {
+        assert!(is_language_server(&raw("ra", "rust-analyzer")));
+    }
+
+    #[test]
+    fn classifies_tsserver() {
+        assert!(is_language_server(&raw("node", "tsserver")));
+    }
+
+    #[test]
+    fn classifies_gopls() {
+        assert!(is_language_server(&raw("gopls", "gopls serve")));
+    }
+
+    #[test]
+    fn classifies_pyright() {
+        assert!(is_language_server(&raw("node", "pyright --stdio")));
+    }
+
+    #[test]
+    fn classifies_clangd() {
+        assert!(is_language_server(&raw("clangd", "clangd --background-index")));
+    }
+
+    #[test]
+    fn not_language_server_for_node() {
+        assert!(!is_language_server(&raw("node", "node app.js")));
+    }
+
+    // --- is_build_tool ---
+
+    #[test]
+    fn classifies_webpack_without_dev_server() {
+        assert!(is_build_tool(&raw("node", "webpack --watch")));
+    }
+
+    #[test]
+    fn not_build_tool_for_webpack_dev_server() {
+        assert!(!is_build_tool(&raw("node", "webpack-dev-server")));
+    }
+
+    #[test]
+    fn classifies_esbuild_without_serve() {
+        assert!(is_build_tool(&raw("node", "esbuild src/index.ts")));
+    }
+
+    #[test]
+    fn not_build_tool_for_esbuild_serve() {
+        assert!(!is_build_tool(&raw("node", "esbuild --serve")));
+    }
+
+    #[test]
+    fn classifies_turbopack() {
+        assert!(is_build_tool(&raw("node", "turbopack build")));
+    }
+
+    #[test]
+    fn classifies_rollup() {
+        assert!(is_build_tool(&raw("node", "rollup -c")));
+    }
+
+    #[test]
+    fn classifies_parcel_watch() {
+        assert!(is_build_tool(&raw("node", "parcel watch src/index.html")));
+    }
+
+    #[test]
+    fn classifies_gradle() {
+        assert!(is_build_tool(&raw("gradle", "gradle build")));
+    }
+
+    #[test]
+    fn classifies_mvn() {
+        assert!(is_build_tool(&raw("mvn", "mvn compile")));
+    }
+
+    #[test]
+    fn classifies_tsc_watch() {
+        assert!(is_build_tool(&raw("node", "tsc --watch")));
+    }
+
+    #[test]
+    fn not_build_tool_for_node() {
+        assert!(!is_build_tool(&raw("node", "node app.js")));
+    }
+
+    // --- is_dev_server ---
+
+    #[test]
+    fn classifies_node_as_dev_server() {
+        assert!(is_dev_server(&raw("node", "node server.js")));
+    }
+
+    #[test]
+    fn classifies_python3_as_dev_server() {
+        assert!(is_dev_server(&raw("python3", "python3 -m http.server")));
+    }
+
+    #[test]
+    fn classifies_deno() {
+        assert!(is_dev_server(&raw("deno", "deno run server.ts")));
+    }
+
+    #[test]
+    fn classifies_bun() {
+        assert!(is_dev_server(&raw("bun", "bun run server.ts")));
+    }
+
+    #[test]
+    fn classifies_cargo() {
+        assert!(is_dev_server(&raw("cargo", "cargo run")));
+    }
+
+    #[test]
+    fn classifies_uvicorn_process() {
+        assert!(is_dev_server(&raw("uvicorn", "uvicorn main:app")));
+    }
+
+    #[test]
+    fn classifies_uvicorn_in_cmd() {
+        assert!(is_dev_server(&raw("python3", "uvicorn main:app")));
+    }
+
+    #[test]
+    fn classifies_npm_run_dev() {
+        assert!(is_dev_server(&raw("whatever", "npm run dev")));
+    }
+
+    #[test]
+    fn classifies_yarn_dev() {
+        assert!(is_dev_server(&raw("whatever", "yarn dev")));
+    }
+
+    #[test]
+    fn classifies_flask_run() {
+        assert!(is_dev_server(&raw("whatever", "flask run")));
+    }
+
+    #[test]
+    fn classifies_rails_server() {
+        assert!(is_dev_server(&raw("whatever", "rails server")));
+    }
+
+    #[test]
+    fn classifies_rails_s() {
+        assert!(is_dev_server(&raw("whatever", "rails s")));
+    }
+
+    #[test]
+    fn classifies_hugo_server() {
+        assert!(is_dev_server(&raw("whatever", "hugo server")));
+    }
+
+    #[test]
+    fn classifies_npx() {
+        assert!(is_dev_server(&raw("whatever", "npx serve")));
+    }
+
+    #[test]
+    fn classifies_webpack_dev_server_as_dev() {
+        assert!(is_dev_server(&raw("node", "webpack-dev-server")));
+    }
+
+    #[test]
+    fn classifies_manage_py_runserver() {
+        assert!(is_dev_server(&raw("python3", "manage.py runserver")));
+    }
+
+    #[test]
+    fn classifies_mix_phx_server() {
+        assert!(is_dev_server(&raw("beam.smp", "mix phx.server")));
+    }
+
+    #[test]
+    fn classifies_dotnet() {
+        assert!(is_dev_server(&raw("dotnet", "dotnet run")));
+    }
+
+    #[test]
+    fn not_dev_server_for_sshd() {
+        assert!(!is_dev_server(&raw("sshd", "sshd")));
+    }
+
+    // --- determine_classification priority ---
+
+    #[test]
+    fn docker_takes_priority_over_dev_server() {
+        let r = raw("docker-proxy", "docker run node server.js");
+        assert_eq!(determine_classification(&r), Classification::Docker);
+    }
+
+    #[test]
+    fn ssh_tunnel_takes_priority_over_system() {
+        let r = raw("ssh", "ssh -L 3000:localhost:3000 host");
+        assert_eq!(determine_classification(&r), Classification::SshTunnel);
+    }
+
+    #[test]
+    fn system_pid_0() {
+        let r = raw_with_pid("kernel", "", 0);
+        assert_eq!(determine_classification(&r), Classification::System);
+    }
+
+    #[test]
+    fn unknown_for_unrecognized() {
+        let r = raw("myapp", "./myapp --port 3000");
+        assert_eq!(determine_classification(&r), Classification::Unknown);
+    }
+
+    #[test]
+    fn classify_produces_correct_classification() {
+        let r = raw("postgres", "postgres -D /data");
+        let entry = classify(r);
+        assert_eq!(entry.classification, Classification::Database);
+        assert_eq!(entry.port, 3000);
+    }
+
+    #[test]
+    fn classify_all_with_empty_input() {
+        let result = classify_all(vec![], &[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn classify_all_sets_ownership() {
+        let node = RawPort {
+            port: 3000,
+            pid: 100,
+            ..raw("node", "node server.js")
+        };
+        let pg = RawPort {
+            port: 5432,
+            pid: 200,
+            ..raw("postgres", "postgres -D /data")
+        };
+        let result = classify_all(vec![node, pg], &[3000, 5432]);
+        let node_entry = result.iter().find(|e| e.process_name == "node").unwrap();
+        assert_eq!(node_entry.ownership, Ownership::Owned);
+        let pg_entry = result.iter().find(|e| e.process_name == "postgres").unwrap();
+        assert_eq!(pg_entry.ownership, Ownership::Blocked);
+    }
+}
