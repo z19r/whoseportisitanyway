@@ -1,4 +1,4 @@
-# whosportisitanyway — Design Spec
+# whoseportisitanyway — Design Spec
 
 A cross-platform TUI that answers: which local ports are in use, who owns them, and is it my dev server or something blocking it?
 
@@ -134,7 +134,7 @@ Configurable tick interval (default 2s). The table diffs against the previous sc
 
 ## CLI Subcommands
 
-Bare invocation (`whosportisitanyway`) launches the TUI. Subcommands:
+Bare invocation (`whoseportisitanyway`) launches the TUI. Subcommands:
 
 ### `snapshot`
 
@@ -150,7 +150,7 @@ Machine-oriented. Defaults to JSON, supports `--plain` for tab-separated. Design
 
 ## Configuration
 
-File: `~/.config/whosportisitanyway/config.toml` (XDG convention). Works with no config file — all values have defaults.
+File: `~/.config/whoseportisitanyway/config.toml` (XDG convention). Works with no config file — all values have defaults.
 
 ```toml
 refresh_interval = 2

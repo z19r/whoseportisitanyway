@@ -20,7 +20,7 @@ fn classify_with_caches(
     framework_cache: &mut HashMap<PathBuf, Option<Framework>>,
 ) -> PortEntry {
     let classification = determine_classification(&raw);
-    let cwd = process_cwd(raw.pid);
+    let cwd = raw.cwd.clone().or_else(|| process_cwd(raw.pid));
     let project = cwd.and_then(|dir| {
         project_cache
             .entry(dir.clone())
@@ -31,6 +31,7 @@ fn classify_with_caches(
     let framework_hint = framework::detect_framework(
         &raw.process_name,
         &raw.command_line,
+        raw.parent_command_line.as_deref(),
         &project,
         framework_cache,
     );
