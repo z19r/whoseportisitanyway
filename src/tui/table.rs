@@ -121,7 +121,7 @@ fn render_table(app: &App, frame: &mut Frame, area: Rect) {
     let title_spans = if wild {
         style::wild_title()
     } else {
-        style::rainbow_title()
+        style::plain_title()
     };
     let mut title_line: Vec<Span> = vec![Span::raw(" ")];
     title_line.extend(title_spans);

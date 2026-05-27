@@ -311,8 +311,9 @@ pub fn run(config: &Config) -> Result<()> {
 }
 
 fn render(app: &App, frame: &mut Frame) {
+    table::render(app, frame);
     match app.view {
-        View::Table => table::render(app, frame),
+        View::Table => {}
         View::Detail => detail::render(app, frame),
         View::Confirm => confirm::render(app, frame),
     }

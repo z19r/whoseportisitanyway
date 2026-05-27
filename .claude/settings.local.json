@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__icm__icm_memory_recall",
+      "Skill(superpowers:brainstorming)",
+      "mcp__icm__icm_memory_store",
+      "Skill(superpowers:writing-plans)",
+      "Skill(everything-claude-code:rust-patterns)",
+      "Bash(./target/debug/whosportisitanyway *)"
+    ]
+  }
+}
