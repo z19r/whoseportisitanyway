@@ -70,8 +70,11 @@ release LEVEL:
     cargo check --quiet
     VERSION=$(grep '^version' Cargo.toml | head -1 | cut -d'"' -f2)
     echo "$VERSION" > VERSION
+    # Sync version into static site
+    sed -i "s|// WHOSEPORTISITANYWAY · v[0-9]*\.[0-9]*\.[0-9]*|// WHOSEPORTISITANYWAY · v${VERSION}|" site/src/Hero.jsx
+    sed -i "s|</span>v[0-9]*\.[0-9]*\.[0-9]*</span>|</span>v${VERSION}</span>|" site/src/Nav.jsx
     git checkout -b "release/v${VERSION}"
-    git add Cargo.toml Cargo.lock VERSION
+    git add Cargo.toml Cargo.lock VERSION site/src/Hero.jsx site/src/Nav.jsx
     git commit -m "release: v${VERSION}"
     git push -u origin "release/v${VERSION}"
     gh pr create \
