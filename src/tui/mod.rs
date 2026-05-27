@@ -326,3 +326,256 @@ fn handle_key(app: &mut App, key: KeyCode) {
         View::Confirm => keybindings::handle_confirm_key(app, key),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn konami_new_starts_at_zero() {
+        let k = KonamiDetector::new();
+        assert_eq!(k.position, 0);
+    }
+
+    #[test]
+    fn konami_full_sequence_returns_true() {
+        let mut k = KonamiDetector::new();
+        for &code in &KONAMI_SEQUENCE[..KONAMI_SEQUENCE.len() - 1] {
+            assert!(!k.feed(code));
+        }
+        assert!(k.feed(KONAMI_SEQUENCE[KONAMI_SEQUENCE.len() - 1]));
+    }
+
+    #[test]
+    fn konami_resets_after_complete() {
+        let mut k = KonamiDetector::new();
+        for &code in &KONAMI_SEQUENCE {
+            k.feed(code);
+        }
+        assert_eq!(k.position, 0);
+    }
+
+    #[test]
+    fn konami_wrong_key_resets() {
+        let mut k = KonamiDetector::new();
+        k.feed(KeyCode::Up);
+        k.feed(KeyCode::Up);
+        assert_eq!(k.position, 2);
+        k.feed(KeyCode::Char('x'));
+        assert_eq!(k.position, 0);
+    }
+
+    #[test]
+    fn konami_wrong_key_restarts_if_first() {
+        let mut k = KonamiDetector::new();
+        k.feed(KeyCode::Up);
+        k.feed(KeyCode::Up);
+        k.feed(KeyCode::Up);
+        assert_eq!(k.position, 1);
+    }
+
+    #[test]
+    fn sort_field_cycles_through_all() {
+        let mut sf = SortField::Port;
+        let mut seen = vec![sf];
+        for _ in 0..4 {
+            sf = sf.next();
+            seen.push(sf);
+        }
+        assert_eq!(sf.next(), SortField::Port);
+        assert_eq!(
+            seen,
+            vec![
+                SortField::Port,
+                SortField::Process,
+                SortField::Type,
+                SortField::Pid,
+                SortField::State,
+            ]
+        );
+    }
+
+    #[test]
+    fn sort_field_labels() {
+        assert_eq!(SortField::Port.label(), "port");
+        assert_eq!(SortField::Process.label(), "process");
+        assert_eq!(SortField::Type.label(), "type");
+        assert_eq!(SortField::Pid.label(), "pid");
+        assert_eq!(SortField::State.label(), "state");
+    }
+
+    #[test]
+    fn filter_cycles_through_all() {
+        let mut f = Filter::All;
+        let mut seen = vec![f];
+        for _ in 0..9 {
+            f = f.next();
+            seen.push(f);
+        }
+        assert_eq!(f.next(), Filter::All);
+        assert_eq!(
+            seen,
+            vec![
+                Filter::All,
+                Filter::Listen,
+                Filter::Established,
+                Filter::DevServer,
+                Filter::Database,
+                Filter::Docker,
+                Filter::Proxy,
+                Filter::Browser,
+                Filter::SshTunnel,
+                Filter::System,
+            ]
+        );
+    }
+
+    #[test]
+    fn filter_labels() {
+        assert_eq!(Filter::All.label(), "all");
+        assert_eq!(Filter::Listen.label(), "listen");
+        assert_eq!(Filter::Established.label(), "established");
+        assert_eq!(Filter::DevServer.label(), "dev server");
+        assert_eq!(Filter::Database.label(), "database");
+        assert_eq!(Filter::Docker.label(), "docker");
+        assert_eq!(Filter::Proxy.label(), "proxy");
+        assert_eq!(Filter::Browser.label(), "browser");
+        assert_eq!(Filter::SshTunnel.label(), "ssh tunnel");
+        assert_eq!(Filter::System.label(), "system");
+    }
+
+    fn make_entry(class: Classification, state: PortState) -> PortEntry {
+        use crate::model::{Ownership, Protocol};
+        PortEntry {
+            port: 3000,
+            protocol: Protocol::Tcp,
+            pid: 100,
+            process_name: "test".into(),
+            command_line: "test".into(),
+            state,
+            classification: class,
+            project: None,
+            local_addr: "127.0.0.1:3000".into(),
+            all_addrs: vec!["127.0.0.1:3000".into()],
+            ownership: Ownership::Untracked,
+        }
+    }
+
+    #[test]
+    fn filter_all_matches_everything() {
+        let e = make_entry(Classification::Docker, PortState::Established);
+        assert!(Filter::All.matches(&e));
+    }
+
+    #[test]
+    fn filter_listen_matches_state() {
+        let listen = make_entry(Classification::DevServer, PortState::Listen);
+        let est = make_entry(Classification::DevServer, PortState::Established);
+        assert!(Filter::Listen.matches(&listen));
+        assert!(!Filter::Listen.matches(&est));
+    }
+
+    #[test]
+    fn filter_established_matches_state() {
+        let est = make_entry(Classification::DevServer, PortState::Established);
+        let listen = make_entry(Classification::DevServer, PortState::Listen);
+        assert!(Filter::Established.matches(&est));
+        assert!(!Filter::Established.matches(&listen));
+    }
+
+    #[test]
+    fn filter_devserver_matches_classification() {
+        let dev = make_entry(Classification::DevServer, PortState::Listen);
+        let docker = make_entry(Classification::Docker, PortState::Listen);
+        assert!(Filter::DevServer.matches(&dev));
+        assert!(!Filter::DevServer.matches(&docker));
+    }
+
+    #[test]
+    fn filter_database_matches() {
+        assert!(Filter::Database.matches(&make_entry(Classification::Database, PortState::Listen)));
+    }
+
+    #[test]
+    fn filter_docker_matches() {
+        assert!(Filter::Docker.matches(&make_entry(Classification::Docker, PortState::Listen)));
+    }
+
+    #[test]
+    fn filter_proxy_matches() {
+        assert!(Filter::Proxy.matches(&make_entry(Classification::Proxy, PortState::Listen)));
+    }
+
+    #[test]
+    fn filter_browser_matches() {
+        assert!(Filter::Browser.matches(&make_entry(Classification::Browser, PortState::Listen)));
+    }
+
+    #[test]
+    fn filter_ssh_matches() {
+        assert!(
+            Filter::SshTunnel.matches(&make_entry(Classification::SshTunnel, PortState::Listen))
+        );
+    }
+
+    #[test]
+    fn filter_system_matches() {
+        assert!(Filter::System.matches(&make_entry(Classification::System, PortState::Listen)));
+    }
+
+    #[test]
+    fn app_new_defaults() {
+        let app = App::new(vec![3000, 8080]);
+        assert!(app.all_entries.is_empty());
+        assert_eq!(app.selected, 0);
+        assert_eq!(app.view, View::Table);
+        assert!(!app.should_quit);
+        assert_eq!(app.sort_field, SortField::Port);
+        assert_eq!(app.filter, Filter::All);
+        assert!(!app.konami_mode);
+    }
+
+    #[test]
+    fn app_selected_entry_none_when_empty() {
+        let app = App::new(vec![]);
+        assert!(app.selected_entry().is_none());
+    }
+
+    #[test]
+    fn app_apply_filter_sort_caps_selected() {
+        let mut app = App::new(vec![]);
+        app.all_entries = vec![
+            make_entry(Classification::DevServer, PortState::Listen),
+            make_entry(Classification::Docker, PortState::Listen),
+        ];
+        app.selected = 5;
+        app.apply_filter_sort();
+        assert_eq!(app.selected, 1);
+    }
+
+    #[test]
+    fn app_cycle_sort() {
+        let mut app = App::new(vec![]);
+        assert_eq!(app.sort_field, SortField::Port);
+        app.cycle_sort();
+        assert_eq!(app.sort_field, SortField::Process);
+    }
+
+    #[test]
+    fn app_cycle_filter() {
+        let mut app = App::new(vec![]);
+        app.all_entries = vec![make_entry(Classification::DevServer, PortState::Listen)];
+        app.selected = 0;
+        app.cycle_filter();
+        assert_eq!(app.filter, Filter::Listen);
+        assert_eq!(app.selected, 0);
+    }
+
+    #[test]
+    fn app_shuffle_entries_single_noop() {
+        let mut app = App::new(vec![]);
+        app.entries = vec![make_entry(Classification::DevServer, PortState::Listen)];
+        app.shuffle_entries();
+        assert_eq!(app.entries.len(), 1);
+    }
+}

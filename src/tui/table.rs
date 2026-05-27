@@ -216,3 +216,167 @@ fn render_status_bar(app: &App, frame: &mut Frame, area: Rect) {
 
     frame.render_widget(bar, area);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::{
+        Classification, Framework, Ownership, PortEntry, PortState, Project, Protocol,
+    };
+    use ratatui::backend::TestBackend;
+
+    fn test_app(n: usize) -> super::super::App {
+        let entries: Vec<PortEntry> = (0..n)
+            .map(|i| PortEntry {
+                port: 3000 + i as u16,
+                protocol: Protocol::Tcp,
+                pid: 100 + i as u32,
+                process_name: format!("proc{i}"),
+                command_line: format!("proc{i} --serve"),
+                classification: Classification::DevServer,
+                ownership: Ownership::Untracked,
+                state: PortState::Listen,
+                local_addr: format!("0.0.0.0:{}", 3000 + i),
+                all_addrs: vec![format!("0.0.0.0:{}", 3000 + i)],
+                project: None,
+            })
+            .collect();
+        super::super::App {
+            all_entries: entries.clone(),
+            entries,
+            selected: 0,
+            view: super::super::View::Table,
+            should_quit: false,
+            watched_ports: vec![],
+            sort_field: super::super::SortField::Port,
+            filter: super::super::Filter::All,
+            konami: super::super::KonamiDetector::new(),
+            konami_mode: false,
+            shuffle_remaining: 0,
+        }
+    }
+
+    #[test]
+    fn render_empty_no_panic() {
+        let app = test_app(0);
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(&app, frame)).unwrap();
+    }
+
+    #[test]
+    fn render_with_entries_no_panic() {
+        let app = test_app(5);
+        let backend = TestBackend::new(100, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(&app, frame)).unwrap();
+    }
+
+    #[test]
+    fn render_wild_mode_no_panic() {
+        let mut app = test_app(3);
+        app.konami_mode = true;
+        let backend = TestBackend::new(100, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(&app, frame)).unwrap();
+    }
+
+    #[test]
+    fn render_with_pid_zero_shows_sudo_hint() {
+        let mut app = test_app(1);
+        app.all_entries[0].pid = 0;
+        app.entries[0].pid = 0;
+        let backend = TestBackend::new(100, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(&app, frame)).unwrap();
+    }
+
+    #[test]
+    fn render_with_project_no_panic() {
+        let mut app = test_app(1);
+        app.entries[0].project = Some(Project {
+            name: "myapp".into(),
+            root: "/tmp/myapp".into(),
+            framework: Some(Framework::Vite),
+        });
+        app.all_entries[0].project = app.entries[0].project.clone();
+        let backend = TestBackend::new(100, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(&app, frame)).unwrap();
+    }
+
+    #[test]
+    fn render_all_sort_columns() {
+        for sf in [
+            super::super::SortField::Port,
+            super::super::SortField::Process,
+            super::super::SortField::Type,
+            super::super::SortField::Pid,
+            super::super::SortField::State,
+        ] {
+            let mut app = test_app(2);
+            app.sort_field = sf;
+            let backend = TestBackend::new(100, 30);
+            let mut terminal = Terminal::new(backend).unwrap();
+            terminal.draw(|frame| render(&app, frame)).unwrap();
+        }
+    }
+
+    #[test]
+    fn render_active_filter_style() {
+        let mut app = test_app(3);
+        app.filter = super::super::Filter::Listen;
+        let backend = TestBackend::new(100, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(&app, frame)).unwrap();
+    }
+
+    #[test]
+    fn render_all_classifications() {
+        let classes = [
+            Classification::DevServer,
+            Classification::Database,
+            Classification::Docker,
+            Classification::Proxy,
+            Classification::Browser,
+            Classification::SshTunnel,
+            Classification::System,
+            Classification::Unknown,
+            Classification::BuildTool,
+            Classification::LanguageServer,
+            Classification::MessageQueue,
+        ];
+        for cls in classes {
+            let mut app = test_app(1);
+            app.entries[0].classification = cls.clone();
+            app.all_entries[0].classification = cls;
+            let backend = TestBackend::new(100, 30);
+            let mut terminal = Terminal::new(backend).unwrap();
+            terminal.draw(|frame| render(&app, frame)).unwrap();
+        }
+    }
+
+    #[test]
+    fn render_all_ownership_types() {
+        for own in [Ownership::Owned, Ownership::Blocked, Ownership::Untracked] {
+            let mut app = test_app(1);
+            app.entries[0].ownership = own.clone();
+            app.all_entries[0].ownership = own;
+            let backend = TestBackend::new(100, 30);
+            let mut terminal = Terminal::new(backend).unwrap();
+            terminal.draw(|frame| render(&app, frame)).unwrap();
+        }
+    }
+
+    #[test]
+    fn render_both_states() {
+        for st in [PortState::Listen, PortState::Established] {
+            let mut app = test_app(1);
+            app.entries[0].state = st.clone();
+            app.all_entries[0].state = st;
+            let backend = TestBackend::new(100, 30);
+            let mut terminal = Terminal::new(backend).unwrap();
+            terminal.draw(|frame| render(&app, frame)).unwrap();
+        }
+    }
+}
