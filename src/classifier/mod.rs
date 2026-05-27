@@ -433,12 +433,18 @@ mod tests {
 
     #[test]
     fn classifies_ssh_local_forward() {
-        assert!(is_ssh_tunnel(&raw("ssh", "ssh -L 3000:localhost:3000 remote")));
+        assert!(is_ssh_tunnel(&raw(
+            "ssh",
+            "ssh -L 3000:localhost:3000 remote"
+        )));
     }
 
     #[test]
     fn classifies_ssh_remote_forward() {
-        assert!(is_ssh_tunnel(&raw("ssh", "ssh -R 3000:localhost:3000 remote")));
+        assert!(is_ssh_tunnel(&raw(
+            "ssh",
+            "ssh -R 3000:localhost:3000 remote"
+        )));
     }
 
     #[test]
@@ -586,7 +592,10 @@ mod tests {
 
     #[test]
     fn classifies_kafka_in_cmd() {
-        assert!(is_message_queue(&raw("java", "kafka.Kafka config.properties")));
+        assert!(is_message_queue(&raw(
+            "java",
+            "kafka.Kafka config.properties"
+        )));
     }
 
     #[test]
@@ -655,7 +664,10 @@ mod tests {
 
     #[test]
     fn classifies_clangd() {
-        assert!(is_language_server(&raw("clangd", "clangd --background-index")));
+        assert!(is_language_server(&raw(
+            "clangd",
+            "clangd --background-index"
+        )));
     }
 
     #[test]
@@ -872,7 +884,10 @@ mod tests {
         let result = classify_all(vec![node, pg], &[3000, 5432]);
         let node_entry = result.iter().find(|e| e.process_name == "node").unwrap();
         assert_eq!(node_entry.ownership, Ownership::Owned);
-        let pg_entry = result.iter().find(|e| e.process_name == "postgres").unwrap();
+        let pg_entry = result
+            .iter()
+            .find(|e| e.process_name == "postgres")
+            .unwrap();
         assert_eq!(pg_entry.ownership, Ownership::Blocked);
     }
 }

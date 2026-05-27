@@ -56,8 +56,8 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::defaults::*;
+    use super::*;
 
     #[test]
     fn default_config_values() {

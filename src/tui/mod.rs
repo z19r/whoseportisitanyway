@@ -513,10 +513,9 @@ mod tests {
 
     #[test]
     fn filter_ssh_matches() {
-        assert!(Filter::SshTunnel.matches(&make_entry(
-            Classification::SshTunnel,
-            PortState::Listen
-        )));
+        assert!(
+            Filter::SshTunnel.matches(&make_entry(Classification::SshTunnel, PortState::Listen))
+        );
     }
 
     #[test]

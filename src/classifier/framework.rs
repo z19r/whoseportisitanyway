@@ -336,7 +336,10 @@ mod tests {
 
     #[test]
     fn cmd_next_start() {
-        assert_eq!(detect_from_command("node next start"), Some(Framework::Next));
+        assert_eq!(
+            detect_from_command("node next start"),
+            Some(Framework::Next)
+        );
     }
 
     #[test]
@@ -551,10 +554,7 @@ mod tests {
 
     #[test]
     fn cmd_hugo_server() {
-        assert_eq!(
-            detect_from_command("hugo server -D"),
-            Some(Framework::Hugo)
-        );
+        assert_eq!(detect_from_command("hugo server -D"), Some(Framework::Hugo));
     }
 
     #[test]
@@ -627,18 +627,12 @@ mod tests {
 
     #[test]
     fn token_pair_rails_s() {
-        assert_eq!(
-            detect_from_token_pairs("rails s"),
-            Some(Framework::Rails)
-        );
+        assert_eq!(detect_from_token_pairs("rails s"), Some(Framework::Rails));
     }
 
     #[test]
     fn token_pair_flask_run() {
-        assert_eq!(
-            detect_from_token_pairs("flask run"),
-            Some(Framework::Flask)
-        );
+        assert_eq!(detect_from_token_pairs("flask run"), Some(Framework::Flask));
     }
 
     #[test]

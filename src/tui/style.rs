@@ -233,7 +233,9 @@ mod tests {
 
     #[test]
     fn hue_to_rgb_red() {
-        let Color::Rgb(r, g, b) = hue_to_rgb(0.0) else { panic!() };
+        let Color::Rgb(r, g, b) = hue_to_rgb(0.0) else {
+            panic!()
+        };
         assert_eq!(r, 255);
         assert_eq!(g, 0);
         assert_eq!(b, 0);
@@ -241,7 +243,9 @@ mod tests {
 
     #[test]
     fn hue_to_rgb_green() {
-        let Color::Rgb(r, g, b) = hue_to_rgb(120.0) else { panic!() };
+        let Color::Rgb(r, g, b) = hue_to_rgb(120.0) else {
+            panic!()
+        };
         assert_eq!(r, 0);
         assert_eq!(g, 255);
         assert_eq!(b, 0);
@@ -249,7 +253,9 @@ mod tests {
 
     #[test]
     fn hue_to_rgb_blue() {
-        let Color::Rgb(r, g, b) = hue_to_rgb(240.0) else { panic!() };
+        let Color::Rgb(r, g, b) = hue_to_rgb(240.0) else {
+            panic!()
+        };
         assert_eq!(r, 0);
         assert_eq!(g, 0);
         assert_eq!(b, 255);
@@ -292,7 +298,9 @@ mod tests {
 
     #[test]
     fn classification_color_devserver_is_green() {
-        let Color::Rgb(r, g, b) = classification_color(&Classification::DevServer) else { panic!() };
+        let Color::Rgb(r, g, b) = classification_color(&Classification::DevServer) else {
+            panic!()
+        };
         assert!(g > r && g > b);
     }
 
@@ -329,13 +337,17 @@ mod tests {
 
     #[test]
     fn state_color_listen_is_yellow() {
-        let Color::Rgb(r, g, _) = state_color(&PortState::Listen) else { panic!() };
+        let Color::Rgb(r, g, _) = state_color(&PortState::Listen) else {
+            panic!()
+        };
         assert!(r > 200 && g > 200);
     }
 
     #[test]
     fn state_color_established_is_dim() {
-        let Color::Rgb(r, _, _) = state_color(&PortState::Established) else { panic!() };
+        let Color::Rgb(r, _, _) = state_color(&PortState::Established) else {
+            panic!()
+        };
         assert!(r < 150);
     }
 
@@ -347,25 +359,33 @@ mod tests {
 
     #[test]
     fn port_color_privileged() {
-        let Color::Rgb(r, _, _) = port_color(80) else { panic!() };
+        let Color::Rgb(r, _, _) = port_color(80) else {
+            panic!()
+        };
         assert_eq!(r, 255);
     }
 
     #[test]
     fn port_color_common() {
-        let Color::Rgb(_, g, _) = port_color(3000) else { panic!() };
+        let Color::Rgb(_, g, _) = port_color(3000) else {
+            panic!()
+        };
         assert_eq!(g, 140);
     }
 
     #[test]
     fn port_color_high() {
-        let Color::Rgb(_, g, _) = port_color(9000) else { panic!() };
+        let Color::Rgb(_, g, _) = port_color(9000) else {
+            panic!()
+        };
         assert_eq!(g, 200);
     }
 
     #[test]
     fn port_color_ephemeral() {
-        let Color::Rgb(r, g, _) = port_color(50000) else { panic!() };
+        let Color::Rgb(r, g, _) = port_color(50000) else {
+            panic!()
+        };
         assert_eq!(r, 160);
         assert_eq!(g, 160);
     }
@@ -412,10 +432,7 @@ mod tests {
     #[test]
     fn rainbow_title_uses_gradient_colors() {
         let spans = rainbow_title();
-        assert_eq!(
-            spans[0].style.fg,
-            Some(TITLE_GRADIENT[0])
-        );
+        assert_eq!(spans[0].style.fg, Some(TITLE_GRADIENT[0]));
     }
 
     #[test]

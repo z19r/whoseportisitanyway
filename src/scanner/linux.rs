@@ -517,7 +517,8 @@ mod tests {
         let path = dir.path().join("tcp");
         let line = "   0: 00000000:1F90 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 12345 1 0000000000000000 100 0 0 10 0";
         std::fs::write(&path, format!("  sl  local_address ...\n{}\n", line)).unwrap();
-        let result = parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids).unwrap();
+        let result =
+            parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].port, 8080);
         assert_eq!(result[0].state, PortState::Listen);
@@ -530,7 +531,8 @@ mod tests {
         let path = dir.path().join("tcp");
         let line = "   0: 00000000:0000 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 12345 1 0000000000000000 100 0 0 10 0";
         std::fs::write(&path, format!("header\n{}\n", line)).unwrap();
-        let result = parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids).unwrap();
+        let result =
+            parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids).unwrap();
         assert!(result.is_empty());
     }
 
@@ -542,7 +544,8 @@ mod tests {
         let path = dir.path().join("tcp");
         let line = "   0: 00000000:0050 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 99999 1 0000000000000000 100 0 0 10 0";
         std::fs::write(&path, format!("header\n{}\n", line)).unwrap();
-        let result = parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids).unwrap();
+        let result =
+            parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].pid, 42);
         assert_eq!(result[0].port, 80);

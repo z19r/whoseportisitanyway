@@ -317,8 +317,11 @@ mod tests {
     #[test]
     fn render_with_multiple_addrs() {
         let mut app = test_app(1);
-        app.entries[0].all_addrs =
-            vec!["0.0.0.0:3000".into(), "127.0.0.1:3000".into(), "::1:3000".into()];
+        app.entries[0].all_addrs = vec![
+            "0.0.0.0:3000".into(),
+            "127.0.0.1:3000".into(),
+            "::1:3000".into(),
+        ];
         let backend = TestBackend::new(80, 30);
         let mut terminal = Terminal::new(backend).unwrap();
         terminal.draw(|frame| render(&app, frame)).unwrap();
