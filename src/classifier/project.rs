@@ -33,6 +33,28 @@ const PROJECT_MARKERS: &[&str] = &[
     "rebar.config",
 ];
 
+pub fn detect_project(cwd: &Path) -> Option<Project> {
+    let mut dir = cwd.to_path_buf();
+    loop {
+        for marker in PROJECT_MARKERS {
+            if dir.join(marker).exists() {
+                let name = dir
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "unknown".to_string());
+                return Some(Project {
+                    name,
+                    root: dir,
+                    framework: None,
+                });
+            }
+        }
+        if !dir.pop() {
+            return None;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -118,28 +140,6 @@ mod tests {
                 "marker {} not detected",
                 marker
             );
-        }
-    }
-}
-
-pub fn detect_project(cwd: &Path) -> Option<Project> {
-    let mut dir = cwd.to_path_buf();
-    loop {
-        for marker in PROJECT_MARKERS {
-            if dir.join(marker).exists() {
-                let name = dir
-                    .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_else(|| "unknown".to_string());
-                return Some(Project {
-                    name,
-                    root: dir,
-                    framework: None,
-                });
-            }
-        }
-        if !dir.pop() {
-            return None;
         }
     }
 }

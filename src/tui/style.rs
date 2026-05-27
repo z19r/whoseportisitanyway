@@ -227,6 +227,30 @@ pub fn wild_dim(row: usize) -> Color {
     wild_color(row * 5 + 60)
 }
 
+pub fn wild_selected_bg() -> Color {
+    let t = tick() / 80;
+    let hue = (t % 360) as f64;
+    let h = ((hue % 360.0) + 360.0) % 360.0;
+    let s = 0.7_f64;
+    let v = 0.35_f64;
+    let c = v * s;
+    let x = c * (1.0 - ((h / 60.0) % 2.0 - 1.0).abs());
+    let m = v - c;
+    let (r, g, b) = match h as u16 {
+        0..=59 => (c, x, 0.0),
+        60..=119 => (x, c, 0.0),
+        120..=179 => (0.0, c, x),
+        180..=239 => (0.0, x, c),
+        240..=299 => (x, 0.0, c),
+        _ => (c, 0.0, x),
+    };
+    Color::Rgb(
+        ((r + m) * 255.0) as u8,
+        ((g + m) * 255.0) as u8,
+        ((b + m) * 255.0) as u8,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -480,28 +504,4 @@ mod tests {
         assert_eq!(SELECTED_FG, Color::White);
         assert_eq!(DIM, Color::Rgb(100, 90, 120));
     }
-}
-
-pub fn wild_selected_bg() -> Color {
-    let t = tick() / 80;
-    let hue = (t % 360) as f64;
-    let h = ((hue % 360.0) + 360.0) % 360.0;
-    let s = 0.7_f64;
-    let v = 0.35_f64;
-    let c = v * s;
-    let x = c * (1.0 - ((h / 60.0) % 2.0 - 1.0).abs());
-    let m = v - c;
-    let (r, g, b) = match h as u16 {
-        0..=59 => (c, x, 0.0),
-        60..=119 => (x, c, 0.0),
-        120..=179 => (0.0, c, x),
-        180..=239 => (0.0, x, c),
-        240..=299 => (x, 0.0, c),
-        _ => (c, 0.0, x),
-    };
-    Color::Rgb(
-        ((r + m) * 255.0) as u8,
-        ((g + m) * 255.0) as u8,
-        ((b + m) * 255.0) as u8,
-    )
 }
