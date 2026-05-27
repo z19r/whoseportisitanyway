@@ -260,7 +260,9 @@ fn detect_from_bin_path(command_line: &str) -> Option<Framework> {
     let needle = "node_modules/.bin/";
     let pos = command_line.find(needle)?;
     let after = &command_line[pos + needle.len()..];
-    let tool = after.split(|c: char| c.is_whitespace() || c == '/').next()?;
+    let tool = after
+        .split(|c: char| c.is_whitespace() || c == '/')
+        .next()?;
     match_tool_name(tool)
 }
 

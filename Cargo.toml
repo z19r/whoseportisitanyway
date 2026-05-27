@@ -1,6 +1,6 @@
 [package]
 name = "whoseportisitanyway"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 description = "Cross-platform TUI for discovering which ports are in use, who owns them, and what they're for"
 license = "MIT"
@@ -8,7 +8,6 @@ repository = "https://github.com/z19r/whoseportisitanyway"
 homepage = "https://github.com/z19r/whoseportisitanyway"
 readme = "README.md"
 keywords = ["ports", "tui", "networking", "monitoring", "terminal"]
-categories = ["command-line-utilities", "network-programming"]
 categories = ["command-line-utilities", "network-programming"]
 
 [dependencies]
@@ -22,3 +21,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
 toml = "0.8"
+
+[profile.release]
+lto = true
+strip = true
+codegen-units = 1

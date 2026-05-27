@@ -2,7 +2,8 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+    paths: [VERSION]
 
 permissions:
   contents: write
@@ -10,27 +11,73 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  check-tag:
+    name: Prepare release metadata
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version
+        id: version
+        run: |
+          VERSION=$(cat VERSION | tr -d '[:space:]')
+          TAG="v${VERSION}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          if git rev-parse "${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists; continuing in recovery mode"
+          else
+            echo "Will create release ${TAG}"
+          fi
+
+  verify:
+    name: Verify release commit
+    needs: check-tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install just
+        run: cargo install just --locked
+
+      - name: Release check
+        run: just release-check
+
   build:
     name: Build ${{ matrix.target }}
+    needs: [check-tag, verify]
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            archive: tar.gz
+            cross: false
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
-            archive: tar.gz
             cross: true
           - target: x86_64-apple-darwin
             os: macos-latest
-            archive: tar.gz
+            cross: false
           - target: aarch64-apple-darwin
             os: macos-latest
-            archive: tar.gz
+            cross: false
 
     steps:
       - uses: actions/checkout@v4
@@ -38,6 +85,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
 
       - name: Install cross
         if: matrix.cross
@@ -54,28 +105,151 @@ jobs:
       - name: Package
         run: |
           cd target/${{ matrix.target }}/release
-          tar czf ../../../whoseportisitanyway-${{ github.ref_name }}-${{ matrix.target }}.${{ matrix.archive }} whoseportisitanyway
+          tar czf ../../../whoseportisitanyway-${{ matrix.target }}.tar.gz whoseportisitanyway
+          cd ../../..
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: whoseportisitanyway-${{ matrix.target }}
-          path: whoseportisitanyway-*.${{ matrix.archive }}
+          path: whoseportisitanyway-${{ matrix.target }}.tar.gz
 
   release:
-    name: Create Release
-    needs: build
+    name: Create release
+    needs: [check-tag, verify, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/download-artifact@v4
         with:
-          path: artifacts
           merge-multiple: true
 
-      - name: Create GitHub Release
+      - name: Create tag if needed
+        env:
+          TAG: ${{ needs.check-tag.outputs.tag }}
+        run: |
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists"
+          else
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
+
+      - name: Generate checksums
+        run: sha256sum whoseportisitanyway-*.tar.gz > SHA256SUMS.txt
+
+      - name: Create or update GitHub release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.check-tag.outputs.tag }}
           generate_release_notes: true
-          files: artifacts/*
+          files: |
+            whoseportisitanyway-*.tar.gz
+            SHA256SUMS.txt
+
+  verify-release:
+    name: Verify GitHub release
+    needs: [check-tag, release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect release metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.check-tag.outputs.tag }}
+        run: |
+          gh release view "$TAG" \
+            --json tagName,isDraft,isPrerelease,assets \
+            > release.json
+          gh release download "$TAG" \
+            --pattern "SHA256SUMS.txt" \
+            --dir .
+          python3 - <<'PY2'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          data = json.load(open("release.json"))
+          required = {
+              "SHA256SUMS.txt",
+              "whoseportisitanyway-aarch64-apple-darwin.tar.gz",
+              "whoseportisitanyway-aarch64-unknown-linux-gnu.tar.gz",
+              "whoseportisitanyway-x86_64-apple-darwin.tar.gz",
+              "whoseportisitanyway-x86_64-unknown-linux-gnu.tar.gz",
+          }
+          assets = {asset["name"] for asset in data["assets"]}
+
+          if data["tagName"] != os.environ["TAG"]:
+              sys.exit("release tag mismatch")
+          if data["isDraft"]:
+              sys.exit("release is still a draft")
+          if data["isPrerelease"]:
+              sys.exit("release is unexpectedly marked prerelease")
+
+          missing = sorted(required - assets)
+          if missing:
+              names = ", ".join(missing)
+              sys.exit(f"missing release assets: {names}")
+
+          checksums = Path("SHA256SUMS.txt")
+          listed = set()
+          for line in checksums.read_text().splitlines():
+              parts = line.split(maxsplit=1)
+              if len(parts) == 2:
+                  listed.add(parts[1].lstrip('*'))
+
+          expected_archive_names = {
+              name for name in required if name.endswith('.tar.gz')
+          }
+          missing_checksums = sorted(expected_archive_names - listed)
+          if missing_checksums:
+              names = ", ".join(missing_checksums)
+              sys.exit(f"missing checksums for: {names}")
+          PY2
+
+  publish-crate:
+    name: Publish to crates.io
+    needs: [check-tag, verify, verify-release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check crates.io version
+        id: crate
+        env:
+          VERSION: ${{ needs.check-tag.outputs.version }}
+        run: |
+          URL="https://crates.io/api/v1/crates/whoseportisitanyway/${VERSION}"
+          STATUS=$(curl -sS \
+            -H "Accept: application/json" \
+            -A "whoseportisitanyway-release-check" \
+            -o /dev/null \
+            -w "%{http_code}" \
+            "$URL")
+          if [ "$STATUS" = "200" ]; then
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+            echo "Version ${VERSION} is already published"
+          elif [ "$STATUS" = "404" ]; then
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+            echo "Version ${VERSION} is not published yet"
+          else
+            echo "Unexpected crates.io status: $STATUS"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.crate.outputs.needed == 'true'
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.crate.outputs.needed == 'true'
+
+      - uses: Swatinem/rust-cache@v2
+        if: steps.crate.outputs.needed == 'true'
+
+      - name: Publish
+        if: steps.crate.outputs.needed == 'true'
+        run: cargo publish --allow-dirty
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

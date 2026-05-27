@@ -8,6 +8,7 @@ use whoseportisitanyway::tui;
 #[derive(Parser)]
 #[command(
     name = "whoseportisitanyway",
+    version = env!("WHOSEPORT_VERSION"),
     about = "Which ports are in use, who owns them, and is it your dev server or something blocking it?"
 )]
 struct Cli {
