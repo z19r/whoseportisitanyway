@@ -6,11 +6,26 @@ use crate::model::{Framework, Project};
 pub fn detect_framework(
     _process_name: &str,
     command_line: &str,
+    parent_command_line: Option<&str>,
     project: &Option<Project>,
     framework_cache: &mut HashMap<PathBuf, Option<Framework>>,
 ) -> Option<Framework> {
     if let Some(fw) = detect_from_command(command_line) {
         return Some(fw);
+    }
+    if let Some(fw) = detect_from_bin_path(command_line) {
+        return Some(fw);
+    }
+    if let Some(fw) = detect_from_token_pairs(command_line) {
+        return Some(fw);
+    }
+    if let Some(parent) = parent_command_line {
+        if let Some(fw) = detect_from_command(parent) {
+            return Some(fw);
+        }
+        if let Some(fw) = detect_from_token_pairs(parent) {
+            return Some(fw);
+        }
     }
     if let Some(proj) = project {
         return framework_cache
@@ -239,4 +254,70 @@ fn has_django_in_requirements(root: &std::path::Path) -> bool {
         }
     }
     false
+}
+
+fn detect_from_bin_path(command_line: &str) -> Option<Framework> {
+    let needle = "node_modules/.bin/";
+    let pos = command_line.find(needle)?;
+    let after = &command_line[pos + needle.len()..];
+    let tool = after.split(|c: char| c.is_whitespace() || c == '/').next()?;
+    match_tool_name(tool)
+}
+
+fn detect_from_token_pairs(command_line: &str) -> Option<Framework> {
+    let tokens: Vec<&str> = command_line.split_whitespace().collect();
+    if tokens.len() < 2 {
+        return None;
+    }
+
+    let pairs: &[(&[&str], Framework)] = &[
+        (&["next", "dev"], Framework::Next),
+        (&["next", "start"], Framework::Next),
+        (&["nuxt", "dev"], Framework::Nuxt),
+        (&["nuxt", "start"], Framework::Nuxt),
+        (&["expo", "start"], Framework::Expo),
+        (&["gatsby", "develop"], Framework::Gatsby),
+        (&["gatsby", "serve"], Framework::Gatsby),
+        (&["astro", "dev"], Framework::Astro),
+        (&["remix", "dev"], Framework::Remix),
+        (&["vite", "dev"], Framework::Vite),
+        (&["vite", "build"], Framework::Vite),
+        (&["nest", "start"], Framework::Nest),
+        (&["hugo", "server"], Framework::Hugo),
+        (&["hugo", "serve"], Framework::Hugo),
+        (&["rails", "server"], Framework::Rails),
+        (&["rails", "s"], Framework::Rails),
+        (&["flask", "run"], Framework::Flask),
+        (&["uvicorn", "main:app"], Framework::FastAPI),
+    ];
+
+    for (pair, fw) in pairs {
+        let a = pair[0];
+        let b = pair[1];
+        for window in tokens.windows(2) {
+            let t0 = window[0].rsplit('/').next().unwrap_or(window[0]);
+            if t0.eq_ignore_ascii_case(a) && window[1].eq_ignore_ascii_case(b) {
+                return Some(fw.clone());
+            }
+        }
+    }
+    None
+}
+
+fn match_tool_name(tool: &str) -> Option<Framework> {
+    match tool.to_lowercase().as_str() {
+        "next" => Some(Framework::Next),
+        "nuxt" | "nuxi" => Some(Framework::Nuxt),
+        "remix" | "remix-serve" => Some(Framework::Remix),
+        "astro" => Some(Framework::Astro),
+        "vite" => Some(Framework::Vite),
+        "gatsby" => Some(Framework::Gatsby),
+        "expo" | "expo-cli" => Some(Framework::Expo),
+        "storybook" | "start-storybook" => Some(Framework::Storybook),
+        "nest" => Some(Framework::Nest),
+        "fastify" => Some(Framework::Fastify),
+        "hugo" => Some(Framework::Hugo),
+        "turbopack" | "next-swc" => Some(Framework::Turbopack),
+        _ => None,
+    }
 }

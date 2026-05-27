@@ -155,6 +155,9 @@ pub struct RawPort {
     pub command_line: String,
     pub state: PortState,
     pub local_addr: String,
+    pub parent_pid: Option<u32>,
+    pub parent_command_line: Option<String>,
+    pub cwd: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::net::{Ipv4Addr, Ipv6Addr};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use super::{ScanError, Scanner};
 use crate::model::{PortState, Protocol, RawPort};
@@ -136,19 +136,28 @@ fn parse_proc_net(
         let inode = fields[9];
         let pid = inode_pids.get(inode).copied();
 
-        let (process_name, command_line) = match pid {
+        let info = match pid {
             Some(p) => read_process_info(p),
-            None => (String::new(), String::new()),
+            None => ProcessInfo {
+                name: String::new(),
+                command_line: String::new(),
+                parent_pid: None,
+                parent_command_line: None,
+                cwd: None,
+            },
         };
 
         ports.push(RawPort {
             port,
             protocol: protocol.clone(),
             pid: pid.unwrap_or(0),
-            process_name,
-            command_line,
+            process_name: info.name,
+            command_line: info.command_line,
             state,
             local_addr: format!("{}:{}", addr_str, port),
+            parent_pid: info.parent_pid,
+            parent_command_line: info.parent_command_line,
+            cwd: info.cwd,
         });
     }
 
@@ -220,7 +229,15 @@ fn format_ipv6(ip: &Ipv6Addr) -> String {
     ip.to_string()
 }
 
-fn read_process_info(pid: u32) -> (String, String) {
+struct ProcessInfo {
+    name: String,
+    command_line: String,
+    parent_pid: Option<u32>,
+    parent_command_line: Option<String>,
+    cwd: Option<PathBuf>,
+}
+
+fn read_process_info(pid: u32) -> ProcessInfo {
     let comm = fs::read_to_string(format!("/proc/{pid}/comm"))
         .unwrap_or_default()
         .trim()
@@ -232,7 +249,34 @@ fn read_process_info(pid: u32) -> (String, String) {
         .trim()
         .to_string();
 
-    (comm, cmdline)
+    let parent_pid = read_parent_pid(pid);
+
+    let parent_command_line = parent_pid.and_then(|ppid| {
+        fs::read_to_string(format!("/proc/{ppid}/cmdline"))
+            .ok()
+            .map(|s| s.replace('\0', " ").trim().to_string())
+            .filter(|s| !s.is_empty())
+    });
+
+    let cwd = fs::read_link(format!("/proc/{pid}/cwd")).ok();
+
+    ProcessInfo {
+        name: comm,
+        command_line: cmdline,
+        parent_pid,
+        parent_command_line,
+        cwd,
+    }
+}
+
+fn read_parent_pid(pid: u32) -> Option<u32> {
+    let status = fs::read_to_string(format!("/proc/{pid}/status")).ok()?;
+    for line in status.lines() {
+        if let Some(val) = line.strip_prefix("PPid:\t") {
+            return val.trim().parse().ok();
+        }
+    }
+    None
 }
 
 fn well_known_hint(port: u16) -> Option<&'static str> {
