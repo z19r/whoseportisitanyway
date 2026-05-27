@@ -128,13 +128,13 @@ pub fn state_color_wild(state: &PortState, row: usize) -> Color {
 
 pub fn plain_title() -> Vec<Span<'static>> {
     vec![Span::styled(
-        "whosportisitanyway",
+        "whoseportisitanyway",
         Style::default().fg(HEADER_FG).bold(),
     )]
 }
 
 pub fn rainbow_title() -> Vec<Span<'static>> {
-    let title = "whosportisitanyway";
+    let title = "whoseportisitanyway";
     title
         .chars()
         .enumerate()
@@ -146,7 +146,7 @@ pub fn rainbow_title() -> Vec<Span<'static>> {
 }
 
 pub fn wild_title() -> Vec<Span<'static>> {
-    let title = "whosportisitanyway";
+    let title = "whoseportisitanyway";
     title
         .chars()
         .enumerate()

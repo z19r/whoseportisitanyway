@@ -1,9 +1,10 @@
 [package]
-name = "whosportisitanyway"
+name = "whoseportisitanyway"
 version = "0.1.0"
 edition = "2021"
 description = "Cross-platform TUI for discovering which ports are in use, who owns them, and what they're for"
 license = "MIT"
+categories = ["command-line-utilities", "network-programming"]
 
 [dependencies]
 anyhow = "1"

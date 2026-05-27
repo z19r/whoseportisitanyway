@@ -1,13 +1,13 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
-use whosportisitanyway::cli;
-use whosportisitanyway::config::Config;
-use whosportisitanyway::tui;
+use whoseportisitanyway::cli;
+use whoseportisitanyway::config::Config;
+use whoseportisitanyway::tui;
 
 #[derive(Parser)]
 #[command(
-    name = "whosportisitanyway",
+    name = "whoseportisitanyway",
     about = "Which ports are in use, who owns them, and is it your dev server or something blocking it?"
 )]
 struct Cli {
