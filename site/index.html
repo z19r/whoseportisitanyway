@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>whoseportisitanyway — TUI port monitor for developers</title>
+<meta name="description" content="Cross-platform terminal UI that discovers which ports are in use, identifies the owning process, detects the project and framework, and lets you act on them." />
+<meta name="color-scheme" content="light dark" />
+<link rel="stylesheet" href="page.css" />
+<script>
+  (function () {
+    try {
+      var saved = localStorage.getItem('wp-theme');
+      if (saved === 'light' || saved === 'dark') {
+        document.documentElement.setAttribute('data-theme', saved);
+        return;
+      }
+    } catch (_) {}
+    var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  })();
+</script>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="src/Nav.jsx"></script>
+<script type="text/babel" src="src/Hero.jsx"></script>
+<script type="text/babel" src="src/Features.jsx"></script>
+<script type="text/babel" src="src/Demo.jsx"></script>
+<script type="text/babel" src="src/Install.jsx"></script>
+<script type="text/babel" src="src/FAQ.jsx"></script>
+<script type="text/babel" src="src/Footer.jsx"></script>
+<script type="text/babel" src="src/App.jsx"></script>
+</body>
+</html>
