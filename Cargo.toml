@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2021"
 description = "Cross-platform TUI for discovering which ports are in use, who owns them, and what they're for"
 license = "MIT"
+repository = "https://github.com/z19r/whoseportisitanyway"
+homepage = "https://github.com/z19r/whoseportisitanyway"
+readme = "README.md"
+keywords = ["ports", "tui", "networking", "monitoring", "terminal"]
+categories = ["command-line-utilities", "network-programming"]
 categories = ["command-line-utilities", "network-programming"]
 
 [dependencies]

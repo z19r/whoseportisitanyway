@@ -49,6 +49,13 @@ list-json:
 
 bar: clean build run
 
+tag-release VERSION:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just ci
+    git tag -a "v{{VERSION}}" -m "Release v{{VERSION}}"
+    echo "Tagged v{{VERSION}}. Push with: git push origin v{{VERSION}}"
+
 clean:
     cargo clean
 
