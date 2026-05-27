@@ -1,0 +1,319 @@
+# Instincts generated from https://github.com/z19r/whoseportisitanyway
+# Generated: 2026-05-27T09:41:12.711Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: whoseportisitanyway-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/z19r/whoseportisitanyway
+---
+
+# Whoseportisitanyway Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: feat, fix, docs, ci
+
+## Evidence
+
+- 5 commits analyzed
+- Detected conventional commit pattern
+- Examples: fix: correct project name typo (whosport → whoseport), feat: add crate metadata and release tooling
+
+---
+id: whoseportisitanyway-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/z19r/whoseportisitanyway
+---
+
+# Whoseportisitanyway Commit Length
+
+## Action
+
+Write moderate-length commit messages (~50 characters)
+
+## Evidence
+
+- Average commit message length: 50 chars
+- Based on 5 commits
+
+---
+id: whoseportisitanyway-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/z19r/whoseportisitanyway
+---
+
+# Whoseportisitanyway Naming Files
+
+## Action
+
+Use camelCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: camelCase
+
+---
+id: whoseportisitanyway-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/z19r/whoseportisitanyway
+---
+
+# Whoseportisitanyway Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: whoseportisitanyway-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/z19r/whoseportisitanyway
+---
+
+# Whoseportisitanyway Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: whoseportisitanyway-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/z19r/whoseportisitanyway
+---
+
+# Whoseportisitanyway Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: whoseportisitanyway-instinct-file-naming
+trigger: "When creating a new source file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: z19r/whoseportisitanyway
+---
+
+# Whoseportisitanyway Instinct File Naming
+
+## Action
+
+Name the file using camelCase
+
+## Evidence
+
+- Pattern in namingConventions.files: camelCase
+
+---
+id: whoseportisitanyway-instinct-function-naming
+trigger: "When defining a new function"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: z19r/whoseportisitanyway
+---
+
+# Whoseportisitanyway Instinct Function Naming
+
+## Action
+
+Name the function using camelCase
+
+## Evidence
+
+- Pattern in namingConventions.functions: camelCase
+
+---
+id: whoseportisitanyway-instinct-class-naming
+trigger: "When defining a new class or struct"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: z19r/whoseportisitanyway
+---
+
+# Whoseportisitanyway Instinct Class Naming
+
+## Action
+
+Name the class or struct using PascalCase
+
+## Evidence
+
+- Pattern in namingConventions.classes: PascalCase
+
+---
+id: whoseportisitanyway-instinct-constant-naming
+trigger: "When defining a constant"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: z19r/whoseportisitanyway
+---
+
+# Whoseportisitanyway Instinct Constant Naming
+
+## Action
+
+Name the constant using SCREAMING_SNAKE_CASE
+
+## Evidence
+
+- Pattern in namingConventions.constants: SCREAMING_SNAKE_CASE
+
+---
+id: whoseportisitanyway-instinct-import-style
+trigger: "When importing modules"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: z19r/whoseportisitanyway
+---
+
+# Whoseportisitanyway Instinct Import Style
+
+## Action
+
+Use relative imports
+
+## Evidence
+
+- Pattern in importStyle: relative
+
+---
+id: whoseportisitanyway-instinct-export-style
+trigger: "When exporting modules or items"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: z19r/whoseportisitanyway
+---
+
+# Whoseportisitanyway Instinct Export Style
+
+## Action
+
+Use named exports
+
+## Evidence
+
+- Pattern in exportStyle: named
+
+---
+id: whoseportisitanyway-instinct-test-location
+trigger: "When adding new tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: z19r/whoseportisitanyway
+---
+
+# Whoseportisitanyway Instinct Test Location
+
+## Action
+
+Place tests in a separate location from source code
+
+## Evidence
+
+- Pattern in architecture.folderStructure.testLocation: separate
+
+---
+id: whoseportisitanyway-instinct-commit-format
+trigger: "When writing a commit message"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: z19r/whoseportisitanyway
+---
+
+# Whoseportisitanyway Instinct Commit Format
+
+## Action
+
+Use conventional commit prefixes: feat, fix, docs, ci
+
+## Evidence
+
+- Seen in commit: fix: correct project name typo (whosport → whoseport)
+- Seen in commit: feat: add crate metadata and release tooling
+- Pattern in commits.prefixes
+
+---
+id: whoseportisitanyway-instinct-commit-length
+trigger: "When writing a commit message"
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: z19r/whoseportisitanyway
+---
+
+# Whoseportisitanyway Instinct Commit Length
+
+## Action
+
+Keep the commit message around 50 characters on average
+
+## Evidence
+
+- Pattern in commits.averageLength: 50
+
+---
+id: whoseportisitanyway-instinct-ci-config-location
+trigger: "When configuring CI or release workflows"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: z19r/whoseportisitanyway
+---
+
+# Whoseportisitanyway Instinct Ci Config Location
+
+## Action
+
+Place workflow YAML files in .github/workflows/
+
+## Evidence
+
+- Pattern in architecture.configFiles: .github/workflows/ci.yml, .github/workflows/release.yml
+
