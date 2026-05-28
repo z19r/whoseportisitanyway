@@ -6,7 +6,12 @@
       "mcp__icm__icm_memory_store",
       "Skill(superpowers:writing-plans)",
       "Skill(everything-claude-code:rust-patterns)",
-      "Bash(./target/debug/whosportisitanyway *)"
+      "Bash(./target/debug/whosportisitanyway *)",
+      "mcp__headroom__headroom_retrieve",
+      "Bash(cargo llvm-cov *)",
+      "Bash(awk '/src\\\\/tui\\\\/keybindings.rs/,/^[^ ]/')",
+      "Bash(awk '/src\\\\/tui\\\\/mod.rs/,/^[^ ]/')",
+      "Bash(awk '/src\\\\/config\\\\/mod.rs/,/^[^ ]/')"
     ]
   }
 }

@@ -6,3 +6,6 @@
 !.claude/rules/
 .claude/rules/*
 !.claude/rules/notify.md
+
+# Netlify CLI local state (machine-specific)
+site/.netlify/
