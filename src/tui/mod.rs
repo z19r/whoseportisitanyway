@@ -497,6 +497,9 @@ mod tests {
             local_addr: "127.0.0.1:3000".into(),
             all_addrs: vec!["127.0.0.1:3000".into()],
             ownership: Ownership::Untracked,
+            uid: None,
+            user: None,
+            remote_addr: None,
         }
     }
 
@@ -633,6 +636,9 @@ mod tests {
             local_addr: format!("127.0.0.1:{port}"),
             all_addrs: vec![format!("127.0.0.1:{port}")],
             ownership: Ownership::Untracked,
+            uid: None,
+            user: None,
+            remote_addr: None,
         }
     }
 

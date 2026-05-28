@@ -98,6 +98,48 @@ pub fn render(app: &App, frame: &mut Frame) {
                 ]));
             }
 
+            // Show user info if available (works even without root/pid)
+            if let Some(ref user) = entry.user {
+                lines.push(Line::from(vec![
+                    Span::styled("User: ", Style::default().fg(dim)),
+                    Span::styled(
+                        user.clone(),
+                        Style::default().fg(if wild {
+                            style::wild_dim(5)
+                        } else {
+                            Color::Rgb(100, 220, 180)
+                        }),
+                    ),
+                ]));
+            } else if let Some(uid) = entry.uid {
+                lines.push(Line::from(vec![
+                    Span::styled("UID: ", Style::default().fg(dim)),
+                    Span::styled(
+                        uid.to_string(),
+                        Style::default().fg(if wild {
+                            style::wild_dim(5)
+                        } else {
+                            Color::Rgb(100, 220, 180)
+                        }),
+                    ),
+                ]));
+            }
+
+            // Show remote address for established connections
+            if let Some(ref remote) = entry.remote_addr {
+                lines.push(Line::from(vec![
+                    Span::styled("Remote: ", Style::default().fg(dim)),
+                    Span::styled(
+                        remote.clone(),
+                        Style::default().fg(if wild {
+                            style::wild_dim(6)
+                        } else {
+                            Color::Rgb(255, 160, 80)
+                        }),
+                    ),
+                ]));
+            }
+
             lines.extend(vec![
                 Line::from(vec![
                     Span::styled("State: ", Style::default().fg(dim)),
@@ -245,6 +287,9 @@ mod tests {
                 local_addr: format!("0.0.0.0:{}", 3000 + i),
                 all_addrs: vec![format!("0.0.0.0:{}", 3000 + i)],
                 project: None,
+                uid: None,
+                user: None,
+                remote_addr: None,
             })
             .collect();
         super::super::App {
@@ -323,6 +368,58 @@ mod tests {
             "::1:3000".into(),
         ];
         let backend = TestBackend::new(80, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(&app, frame)).unwrap();
+    }
+
+    #[test]
+    fn render_with_user_info_no_panic() {
+        let mut app = test_app(1);
+        app.entries[0].uid = Some(1000);
+        app.entries[0].user = Some("alice".into());
+        let backend = TestBackend::new(80, 35);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(&app, frame)).unwrap();
+    }
+
+    #[test]
+    fn render_with_uid_only_no_panic() {
+        let mut app = test_app(1);
+        app.entries[0].uid = Some(0);
+        app.entries[0].user = None;
+        let backend = TestBackend::new(80, 35);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(&app, frame)).unwrap();
+    }
+
+    #[test]
+    fn render_with_remote_addr_no_panic() {
+        let mut app = test_app(1);
+        app.entries[0].remote_addr = Some("192.168.1.100:54321".into());
+        let backend = TestBackend::new(80, 35);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(&app, frame)).unwrap();
+    }
+
+    #[test]
+    fn render_with_all_new_fields_no_panic() {
+        let mut app = test_app(1);
+        app.entries[0].uid = Some(1000);
+        app.entries[0].user = Some("developer".into());
+        app.entries[0].remote_addr = Some("10.0.0.1:443".into());
+        let backend = TestBackend::new(80, 40);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(&app, frame)).unwrap();
+    }
+
+    #[test]
+    fn render_with_all_new_fields_wild_no_panic() {
+        let mut app = test_app(1);
+        app.konami_mode = true;
+        app.entries[0].uid = Some(1000);
+        app.entries[0].user = Some("developer".into());
+        app.entries[0].remote_addr = Some("10.0.0.1:443".into());
+        let backend = TestBackend::new(80, 40);
         let mut terminal = Terminal::new(backend).unwrap();
         terminal.draw(|frame| render(&app, frame)).unwrap();
     }

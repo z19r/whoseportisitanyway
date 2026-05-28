@@ -133,6 +133,9 @@ mod tests {
                 local_addr: format!("0.0.0.0:{}", 3000 + i),
                 all_addrs: vec![format!("0.0.0.0:{}", 3000 + i)],
                 project: None,
+                uid: None,
+                user: None,
+                remote_addr: None,
             })
             .collect();
         super::super::App {

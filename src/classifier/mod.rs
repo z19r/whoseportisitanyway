@@ -57,6 +57,9 @@ fn classify_with_caches(
         local_addr: raw.local_addr,
         all_addrs,
         ownership: Ownership::Untracked,
+        uid: raw.uid,
+        user: raw.user,
+        remote_addr: raw.remote_addr,
     }
 }
 
@@ -382,6 +385,9 @@ mod tests {
             parent_pid: None,
             parent_command_line: None,
             cwd: None,
+            uid: None,
+            user: None,
+            remote_addr: None,
         }
     }
 
@@ -861,6 +867,42 @@ mod tests {
         let entry = classify(r);
         assert_eq!(entry.classification, Classification::Database);
         assert_eq!(entry.port, 3000);
+    }
+
+    #[test]
+    fn classify_passes_through_uid_and_user() {
+        let r = RawPort {
+            uid: Some(1000),
+            user: Some("alice".to_string()),
+            remote_addr: None,
+            ..raw("node", "node server.js")
+        };
+        let entry = classify(r);
+        assert_eq!(entry.uid, Some(1000));
+        assert_eq!(entry.user, Some("alice".to_string()));
+        assert_eq!(entry.remote_addr, None);
+    }
+
+    #[test]
+    fn classify_passes_through_remote_addr() {
+        let r = RawPort {
+            uid: Some(0),
+            user: Some("root".to_string()),
+            remote_addr: Some("192.168.1.1:54321".to_string()),
+            ..raw("sshd", "sshd")
+        };
+        let entry = classify(r);
+        assert_eq!(entry.remote_addr, Some("192.168.1.1:54321".to_string()));
+        assert_eq!(entry.user, Some("root".to_string()));
+    }
+
+    #[test]
+    fn classify_with_no_uid_passes_none() {
+        let r = raw("unknown", "./myapp");
+        let entry = classify(r);
+        assert_eq!(entry.uid, None);
+        assert_eq!(entry.user, None);
+        assert_eq!(entry.remote_addr, None);
     }
 
     #[test]

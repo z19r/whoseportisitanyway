@@ -51,11 +51,22 @@ fn render_table(app: &App, frame: &mut Frame, area: Rect) {
                 Color::Rgb(180, 160, 220)
             };
 
+            // When pid=0 (blocked process), show user info as fallback
+            let display_name = if e.process_name.is_empty() {
+                if let Some(ref user) = e.user {
+                    format!("[{}]", user)
+                } else {
+                    "—".to_string()
+                }
+            } else {
+                e.process_name.clone()
+            };
+
             Row::new(vec![
                 Cell::from(format!(" {:>7}", e.pid)).style(Style::default().fg(dim)),
                 Cell::from(format!("{:>5}", e.port)).style(Style::default().fg(port_color).bold()),
                 Cell::from(format!(" {:<5}", e.protocol)).style(Style::default().fg(dim)),
-                Cell::from(format!(" {}", e.process_name)).style(Style::default().fg(name_color)),
+                Cell::from(format!(" {}", display_name)).style(Style::default().fg(name_color)),
                 Cell::from(format!(" {}", e.classification)).style(Style::default().fg(type_color)),
                 Cell::from(format!(
                     " {}",
@@ -239,6 +250,9 @@ mod tests {
                 local_addr: format!("0.0.0.0:{}", 3000 + i),
                 all_addrs: vec![format!("0.0.0.0:{}", 3000 + i)],
                 project: None,
+                uid: None,
+                user: None,
+                remote_addr: None,
             })
             .collect();
         super::super::App {
