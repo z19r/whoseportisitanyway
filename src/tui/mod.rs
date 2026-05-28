@@ -236,7 +236,7 @@ impl App {
     fn refresh(&mut self) -> Result<()> {
         // Capture modal identity before the data changes.
         let modal_identity = if self.view != View::Table {
-            self.entries.get(self.selected).map(|e| (e.port, e.protocol.clone(), e.pid))
+            self.entries.get(self.selected).map(|e| (e.port, e.protocol, e.pid))
         } else {
             None
         };

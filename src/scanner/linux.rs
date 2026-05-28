@@ -149,7 +149,7 @@ fn parse_proc_net(
 
         ports.push(RawPort {
             port,
-            protocol: protocol.clone(),
+            protocol,
             pid: pid.unwrap_or(0),
             process_name: info.name,
             command_line: info.command_line,
