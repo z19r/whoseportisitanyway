@@ -1,6 +1,6 @@
 [package]
 name = "whoseportisitanyway"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 description = "Cross-platform TUI for discovering which ports are in use, who owns them, and what they're for"
 license = "MIT"
