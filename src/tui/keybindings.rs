@@ -40,6 +40,12 @@ pub fn handle_detail_key(app: &mut App, key: KeyCode) {
     match key {
         KeyCode::Char('q') | KeyCode::Esc => app.view = View::Table,
         KeyCode::Char('x') => app.view = View::Confirm,
+        KeyCode::Char('o') => {
+            if let Some(entry) = app.selected_entry() {
+                let url = super::detail::build_search_url(entry);
+                super::detail::open_in_browser(&url);
+            }
+        }
         _ => {}
     }
 }
@@ -288,6 +294,23 @@ mod tests {
         let mut app = test_app(3);
         app.view = View::Detail;
         handle_detail_key(&mut app, KeyCode::Char('z'));
+        assert_eq!(app.view, View::Detail);
+    }
+
+    #[test]
+    fn detail_o_does_not_change_view() {
+        // 'o' triggers browser open but does not change the view
+        let mut app = test_app(3);
+        app.view = View::Detail;
+        handle_detail_key(&mut app, KeyCode::Char('o'));
+        assert_eq!(app.view, View::Detail);
+    }
+
+    #[test]
+    fn detail_o_on_empty_app_is_noop() {
+        let mut app = test_app(0);
+        app.view = View::Detail;
+        handle_detail_key(&mut app, KeyCode::Char('o'));
         assert_eq!(app.view, View::Detail);
     }
 
