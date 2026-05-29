@@ -298,7 +298,7 @@ fn render_status_bar(app: &App, frame: &mut Frame, area: Rect) {
             Style::default().fg(group_color),
         ),
         key("h"),
-        Span::styled(hide_sys_label.to_string(), Style::default().fg(hide_sys_color)),
+        Span::styled(hide_sys_label, Style::default().fg(hide_sys_color)),
         key("r"),
         label(" refresh  "),
         key("q"),

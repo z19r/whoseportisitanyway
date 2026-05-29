@@ -22,7 +22,8 @@
       "Bash(awk NR>=308 && NR<=345 *)",
       "Bash(awk 'NR>=14 && NR<=242' /home/zrk/code/whoseportisitanyway/.claude/worktrees/feat+tui-improvements/src/tui/table.rs)",
       "Bash(command -v cargo-audit)",
-      "Bash(cargo audit *)"
+      "Bash(cargo audit *)",
+      "Bash(rustfmt --check --edition 2021)"
     ]
   }
 }

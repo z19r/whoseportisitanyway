@@ -218,7 +218,7 @@ pub struct App {
     pub konami: KonamiDetector,
     pub konami_mode: bool,
     shuffle_remaining: u8,
-    pub hide_system: bool,
+    pub(crate) hide_system: bool,
 }
 
 impl App {
@@ -332,7 +332,10 @@ impl App {
         self.group_labels = if self.group_field == GroupField::None {
             Vec::new()
         } else {
-            filtered.iter().map(|e| self.group_field.group_key(e)).collect()
+            filtered
+                .iter()
+                .map(|e| self.group_field.group_key(e))
+                .collect()
         };
 
         self.entries = filtered;
@@ -754,7 +757,11 @@ mod tests {
 
         app.toggle_hide_system();
         assert!(!app.hide_system);
-        assert_eq!(app.entries.len(), 2, "both entries restored after second toggle");
+        assert_eq!(
+            app.entries.len(),
+            2,
+            "both entries restored after second toggle"
+        );
     }
 
     #[test]
