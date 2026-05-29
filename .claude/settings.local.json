@@ -11,7 +11,18 @@
       "Bash(cargo llvm-cov *)",
       "Bash(awk '/src\\\\/tui\\\\/keybindings.rs/,/^[^ ]/')",
       "Bash(awk '/src\\\\/tui\\\\/mod.rs/,/^[^ ]/')",
-      "Bash(awk '/src\\\\/config\\\\/mod.rs/,/^[^ ]/')"
+      "Bash(awk '/src\\\\/config\\\\/mod.rs/,/^[^ ]/')",
+      "Bash(awk '/fn well_known_hint/,/^}/' /home/zrk/code/whoseportisitanyway/.claude/worktrees/feat+tui-improvements/src/scanner/linux.rs)",
+      "Bash(awk '/^fn well_known_hint/,/^}/' /home/zrk/code/whoseportisitanyway/.claude/worktrees/feat+tui-improvements/src/scanner/linux.rs)",
+      "Bash(cargo locate-project *)",
+      "Bash(/home/zrk/.local/share/mise/shims/cargo check *)",
+      "Bash(/home/zrk/.cargo/bin/cargo check *)",
+      "Bash(/home/zrk/.cargo/bin/cargo test *)",
+      "Bash(/home/zrk/.cargo/bin/cargo clippy *)",
+      "Bash(awk NR>=308 && NR<=345 *)",
+      "Bash(awk 'NR>=14 && NR<=242' /home/zrk/code/whoseportisitanyway/.claude/worktrees/feat+tui-improvements/src/tui/table.rs)",
+      "Bash(command -v cargo-audit)",
+      "Bash(cargo audit *)"
     ]
   }
 }

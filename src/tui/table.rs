@@ -25,7 +25,10 @@ fn render_table(app: &App, frame: &mut Frame, area: Rect) {
         if grouping_active {
             let current_label = app.group_labels.get(i).map(|s| s.as_str()).unwrap_or("");
             let prev_label = if i > 0 {
-                app.group_labels.get(i - 1).map(|s| s.as_str()).unwrap_or("")
+                app.group_labels
+                    .get(i - 1)
+                    .map(|s| s.as_str())
+                    .unwrap_or("")
             } else {
                 ""
             };
@@ -43,8 +46,7 @@ fn render_table(app: &App, frame: &mut Frame, area: Rect) {
                         .italic()
                 };
                 let header_row = Row::new(vec![
-                    Cell::from(format!("  \u{25B8} {current_label}"))
-                        .style(header_style),
+                    Cell::from(format!("  \u{25B8} {current_label}")).style(header_style),
                     Cell::from(""),
                     Cell::from(""),
                     Cell::from(""),
@@ -230,7 +232,11 @@ fn render_table(app: &App, frame: &mut Frame, area: Rect) {
     let highlight_idx = if grouping_active {
         visual_selected
     } else {
-        if app.entries.is_empty() { None } else { Some(app.selected) }
+        if app.entries.is_empty() {
+            None
+        } else {
+            Some(app.selected)
+        }
     };
 
     frame.render_stateful_widget(
@@ -489,11 +495,7 @@ mod tests {
     fn render_with_group_field_state_no_panic() {
         let mut app = test_app(3);
         app.group_field = super::super::GroupField::State;
-        app.group_labels = app
-            .entries
-            .iter()
-            .map(|e| e.state.to_string())
-            .collect();
+        app.group_labels = app.entries.iter().map(|e| e.state.to_string()).collect();
         let backend = TestBackend::new(100, 30);
         let mut terminal = Terminal::new(backend).unwrap();
         terminal.draw(|frame| render(&app, frame)).unwrap();
@@ -504,11 +506,7 @@ mod tests {
         let mut app = test_app(3);
         app.konami_mode = true;
         app.group_field = super::super::GroupField::Process;
-        app.group_labels = app
-            .entries
-            .iter()
-            .map(|e| e.process_name.clone())
-            .collect();
+        app.group_labels = app.entries.iter().map(|e| e.process_name.clone()).collect();
         let backend = TestBackend::new(100, 30);
         let mut terminal = Terminal::new(backend).unwrap();
         terminal.draw(|frame| render(&app, frame)).unwrap();

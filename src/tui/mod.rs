@@ -264,12 +264,7 @@ impl App {
     /// selected entry (port + protocol + pid) before the entries list changes, then
     /// find its new position in the refreshed list.  If the entry is gone, close the
     /// modal by transitioning back to Table view.
-    fn check_modal_validity(
-        &mut self,
-        port: u16,
-        protocol: &crate::model::Protocol,
-        pid: u32,
-    ) {
+    fn check_modal_validity(&mut self, port: u16, protocol: &crate::model::Protocol, pid: u32) {
         match self
             .entries
             .iter()
@@ -287,7 +282,9 @@ impl App {
     fn refresh(&mut self) -> Result<()> {
         // Capture modal identity before the data changes.
         let modal_identity = if self.view != View::Table {
-            self.entries.get(self.selected).map(|e| (e.port, e.protocol, e.pid))
+            self.entries
+                .get(self.selected)
+                .map(|e| (e.port, e.protocol, e.pid))
         } else {
             None
         };
@@ -328,11 +325,11 @@ impl App {
             filtered.sort_by_key(|a| gf.group_key(a));
         }
 
-        // Build the group_labels vec — one entry per row, mirroring `filtered`.
-        self.group_labels = filtered
-            .iter()
-            .map(|e| self.group_field.group_key(e))
-            .collect();
+        self.group_labels = if self.group_field == GroupField::None {
+            Vec::new()
+        } else {
+            filtered.iter().map(|e| self.group_field.group_key(e)).collect()
+        };
 
         self.entries = filtered;
         if self.selected >= self.entries.len() && !self.entries.is_empty() {
@@ -692,7 +689,12 @@ mod tests {
     }
 
     // Helpers for check_modal_validity tests
-    fn make_entry_custom(port: u16, pid: u32, class: Classification, state: PortState) -> PortEntry {
+    fn make_entry_custom(
+        port: u16,
+        pid: u32,
+        class: Classification,
+        state: PortState,
+    ) -> PortEntry {
         use crate::model::{Ownership, Protocol};
         PortEntry {
             port,
@@ -717,7 +719,12 @@ mod tests {
         use crate::model::Protocol;
         let mut app = App::new(vec![]);
         // Populate with one entry and open Detail view
-        app.entries = vec![make_entry_custom(3000, 100, Classification::DevServer, PortState::Listen)];
+        app.entries = vec![make_entry_custom(
+            3000,
+            100,
+            Classification::DevServer,
+            PortState::Listen,
+        )];
         app.selected = 0;
         app.view = View::Detail;
 
@@ -728,14 +735,23 @@ mod tests {
         // check_modal_validity should close the modal
         app.check_modal_validity(3000, &Protocol::Tcp, 100);
 
-        assert_eq!(app.view, View::Table, "modal should close when port disappears");
+        assert_eq!(
+            app.view,
+            View::Table,
+            "modal should close when port disappears"
+        );
     }
 
     #[test]
     fn check_modal_validity_closes_confirm_when_entry_gone() {
         use crate::model::Protocol;
         let mut app = App::new(vec![]);
-        app.entries = vec![make_entry_custom(8080, 200, Classification::Database, PortState::Listen)];
+        app.entries = vec![make_entry_custom(
+            8080,
+            200,
+            Classification::Database,
+            PortState::Listen,
+        )];
         app.selected = 0;
         app.view = View::Confirm;
 
@@ -744,7 +760,11 @@ mod tests {
 
         app.check_modal_validity(8080, &Protocol::Tcp, 200);
 
-        assert_eq!(app.view, View::Table, "confirm modal should close when port disappears");
+        assert_eq!(
+            app.view,
+            View::Table,
+            "confirm modal should close when port disappears"
+        );
     }
 
     #[test]
@@ -760,7 +780,11 @@ mod tests {
         // Entry still present after refresh
         app.check_modal_validity(3000, &Protocol::Tcp, 100);
 
-        assert_eq!(app.view, View::Detail, "modal should stay open when port still exists");
+        assert_eq!(
+            app.view,
+            View::Detail,
+            "modal should stay open when port still exists"
+        );
         assert_eq!(app.selected, 0);
     }
 
@@ -777,23 +801,34 @@ mod tests {
         app.view = View::Detail;
 
         // After refresh, 3000 is gone — 8080 is now at index 0
-        app.all_entries = vec![
-            make_entry_custom(8080, 200, Classification::Database, PortState::Listen),
-        ];
+        app.all_entries = vec![make_entry_custom(
+            8080,
+            200,
+            Classification::Database,
+            PortState::Listen,
+        )];
         app.apply_filter_sort();
 
         // check_modal_validity should update selected to new position
         app.check_modal_validity(8080, &Protocol::Tcp, 200);
 
         assert_eq!(app.view, View::Detail, "modal should stay open");
-        assert_eq!(app.selected, 0, "selected index should point to new position of entry");
+        assert_eq!(
+            app.selected, 0,
+            "selected index should point to new position of entry"
+        );
     }
 
     #[test]
     fn check_modal_validity_noop_in_table_view() {
         use crate::model::Protocol;
         let mut app = App::new(vec![]);
-        app.entries = vec![make_entry_custom(3000, 100, Classification::DevServer, PortState::Listen)];
+        app.entries = vec![make_entry_custom(
+            3000,
+            100,
+            Classification::DevServer,
+            PortState::Listen,
+        )];
         app.selected = 0;
         app.view = View::Table;
 
@@ -959,8 +994,14 @@ mod tests {
 
         // All Database entries should come before DevServer (alphabetical: "Database" < "Dev Server")
         let labels: Vec<&str> = app.group_labels.iter().map(|s| s.as_str()).collect();
-        assert_eq!(labels[0], labels[1], "first two entries should share a group");
-        assert_ne!(labels[1], labels[2], "third entry should be in a different group");
+        assert_eq!(
+            labels[0], labels[1],
+            "first two entries should share a group"
+        );
+        assert_ne!(
+            labels[1], labels[2],
+            "third entry should be in a different group"
+        );
         // Verify the actual groups
         assert_eq!(app.entries[0].classification, Classification::Database);
         assert_eq!(app.entries[1].classification, Classification::Database);
@@ -1088,24 +1129,22 @@ mod tests {
     fn app_cycle_group_resets_selected() {
         use crate::model::{Ownership, Protocol};
         let mut app = App::new(vec![]);
-        app.all_entries = vec![
-            PortEntry {
-                port: 3000,
-                protocol: Protocol::Tcp,
-                pid: 1,
-                process_name: "node".into(),
-                command_line: "node".into(),
-                state: PortState::Listen,
-                classification: Classification::DevServer,
-                project: None,
-                local_addr: "127.0.0.1:3000".into(),
-                all_addrs: vec![],
-                ownership: Ownership::Untracked,
-                uid: None,
-                user: None,
-                remote_addr: None,
-            },
-        ];
+        app.all_entries = vec![PortEntry {
+            port: 3000,
+            protocol: Protocol::Tcp,
+            pid: 1,
+            process_name: "node".into(),
+            command_line: "node".into(),
+            state: PortState::Listen,
+            classification: Classification::DevServer,
+            project: None,
+            local_addr: "127.0.0.1:3000".into(),
+            all_addrs: vec![],
+            ownership: Ownership::Untracked,
+            uid: None,
+            user: None,
+            remote_addr: None,
+        }];
         app.apply_filter_sort();
         app.selected = 0;
         app.cycle_group();

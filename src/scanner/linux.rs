@@ -582,14 +582,26 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("tcp");
         std::fs::write(&path, "  sl  local_address ...\n").unwrap();
-        let result = parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids, &HashMap::new());
+        let result = parse_proc_net(
+            path.to_str().unwrap(),
+            Protocol::Tcp,
+            false,
+            &inode_pids,
+            &HashMap::new(),
+        );
         assert!(result.unwrap().is_empty());
     }
 
     #[test]
     fn parse_proc_net_missing_file() {
         let inode_pids = HashMap::new();
-        let result = parse_proc_net("/nonexistent/path", Protocol::Tcp, false, &inode_pids, &HashMap::new());
+        let result = parse_proc_net(
+            "/nonexistent/path",
+            Protocol::Tcp,
+            false,
+            &inode_pids,
+            &HashMap::new(),
+        );
         assert!(result.unwrap().is_empty());
     }
 
@@ -599,7 +611,13 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("tcp");
         std::fs::write(&path, "header\nshort line\n").unwrap();
-        let result = parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids, &HashMap::new());
+        let result = parse_proc_net(
+            path.to_str().unwrap(),
+            Protocol::Tcp,
+            false,
+            &inode_pids,
+            &HashMap::new(),
+        );
         assert!(result.unwrap().is_empty());
     }
 
@@ -610,8 +628,14 @@ mod tests {
         let path = dir.path().join("tcp");
         let line = "   0: 00000000:1F90 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 12345 1 0000000000000000 100 0 0 10 0";
         std::fs::write(&path, format!("  sl  local_address ...\n{}\n", line)).unwrap();
-        let result =
-            parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids, &HashMap::new()).unwrap();
+        let result = parse_proc_net(
+            path.to_str().unwrap(),
+            Protocol::Tcp,
+            false,
+            &inode_pids,
+            &HashMap::new(),
+        )
+        .unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].port, 8080);
         assert_eq!(result[0].state, PortState::Listen);
@@ -624,8 +648,14 @@ mod tests {
         let path = dir.path().join("tcp");
         let line = "   0: 00000000:0000 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 12345 1 0000000000000000 100 0 0 10 0";
         std::fs::write(&path, format!("header\n{}\n", line)).unwrap();
-        let result =
-            parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids, &HashMap::new()).unwrap();
+        let result = parse_proc_net(
+            path.to_str().unwrap(),
+            Protocol::Tcp,
+            false,
+            &inode_pids,
+            &HashMap::new(),
+        )
+        .unwrap();
         assert!(result.is_empty());
     }
 
@@ -637,8 +667,14 @@ mod tests {
         let path = dir.path().join("tcp");
         let line = "   0: 00000000:0050 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 99999 1 0000000000000000 100 0 0 10 0";
         std::fs::write(&path, format!("header\n{}\n", line)).unwrap();
-        let result =
-            parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids, &HashMap::new()).unwrap();
+        let result = parse_proc_net(
+            path.to_str().unwrap(),
+            Protocol::Tcp,
+            false,
+            &inode_pids,
+            &HashMap::new(),
+        )
+        .unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].pid, 42);
         assert_eq!(result[0].port, 80);
@@ -654,8 +690,14 @@ mod tests {
         // Field index 7 (0-based) is the UID — value 1000 here
         let line = "   0: 00000000:1F90 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 12345 1 0000000000000000 100 0 0 10 0";
         std::fs::write(&path, format!("header\n{}\n", line)).unwrap();
-        let result =
-            parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids, &HashMap::new()).unwrap();
+        let result = parse_proc_net(
+            path.to_str().unwrap(),
+            Protocol::Tcp,
+            false,
+            &inode_pids,
+            &HashMap::new(),
+        )
+        .unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].uid, Some(1000));
     }
@@ -669,8 +711,14 @@ mod tests {
         // UID 0 = root
         let line = "   0: 00000000:0016 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 11111 1 0000000000000000 100 0 0 10 0";
         std::fs::write(&path, format!("header\n{}\n", line)).unwrap();
-        let result =
-            parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids, &uid_map).unwrap();
+        let result = parse_proc_net(
+            path.to_str().unwrap(),
+            Protocol::Tcp,
+            false,
+            &inode_pids,
+            &uid_map,
+        )
+        .unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].uid, Some(0));
         assert_eq!(result[0].user, Some("root".to_string()));
@@ -706,8 +754,14 @@ mod tests {
         // State 01 = ESTABLISHED, remote = 192.168.1.100:443 (6401A8C0:01BB)
         let line = "   0: 0100007F:1F90 6401A8C0:01BB 01 00000000:00000000 00:00000000 00000000  1000        0 55555 1 0000000000000000 100 0 0 10 0";
         std::fs::write(&path, format!("header\n{}\n", line)).unwrap();
-        let result =
-            parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids, &HashMap::new()).unwrap();
+        let result = parse_proc_net(
+            path.to_str().unwrap(),
+            Protocol::Tcp,
+            false,
+            &inode_pids,
+            &HashMap::new(),
+        )
+        .unwrap();
         assert_eq!(result.len(), 1);
         assert!(result[0].remote_addr.is_some());
         let remote = result[0].remote_addr.as_ref().unwrap();
@@ -722,8 +776,14 @@ mod tests {
         // State 0A = LISTEN, remote = 0.0.0.0:0
         let line = "   0: 00000000:1F90 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 12345 1 0000000000000000 100 0 0 10 0";
         std::fs::write(&path, format!("header\n{}\n", line)).unwrap();
-        let result =
-            parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids, &HashMap::new()).unwrap();
+        let result = parse_proc_net(
+            path.to_str().unwrap(),
+            Protocol::Tcp,
+            false,
+            &inode_pids,
+            &HashMap::new(),
+        )
+        .unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].remote_addr, None);
     }
@@ -771,7 +831,8 @@ mod tests {
 
     #[test]
     fn resolve_uid_from_mock_passwd_root() {
-        let mock_passwd = "root:x:0:0:root:/root:/bin/bash\nalice:x:1000:1000:Alice:/home/alice:/bin/bash\n";
+        let mock_passwd =
+            "root:x:0:0:root:/root:/bin/bash\nalice:x:1000:1000:Alice:/home/alice:/bin/bash\n";
         let uid_to_find: u32 = 0;
         let found = mock_passwd.lines().find_map(|line| {
             let parts: Vec<&str> = line.splitn(7, ':').collect();
@@ -789,7 +850,8 @@ mod tests {
 
     #[test]
     fn resolve_uid_from_mock_passwd_not_found() {
-        let mock_passwd = "root:x:0:0:root:/root:/bin/bash\nalice:x:1000:1000:Alice:/home/alice:/bin/bash\n";
+        let mock_passwd =
+            "root:x:0:0:root:/root:/bin/bash\nalice:x:1000:1000:Alice:/home/alice:/bin/bash\n";
         let uid_to_find: u32 = 9999;
         let found: Option<String> = mock_passwd.lines().find_map(|line| {
             let parts: Vec<&str> = line.splitn(7, ':').collect();
