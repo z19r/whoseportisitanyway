@@ -802,7 +802,7 @@ mod tests {
     fn parse_passwd_missing_uid_returns_none() {
         let content = "root:x:0:0:root:/root:/bin/bash\n";
         let map = parse_passwd_to_uid_map(content);
-        assert!(map.get(&9999).is_none());
+        assert!(!map.contains.key(&9999));
     }
 
     #[test]
