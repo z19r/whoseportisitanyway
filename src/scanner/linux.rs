@@ -11,30 +11,35 @@ pub struct LinuxScanner;
 impl Scanner for LinuxScanner {
     fn scan(&self) -> Result<Vec<RawPort>, ScanError> {
         let inode_pids = build_inode_pid_map();
+        let uid_map = load_uid_map();
         let mut ports = Vec::new();
         ports.extend(parse_proc_net(
             "/proc/net/tcp",
             Protocol::Tcp,
             false,
             &inode_pids,
+            &uid_map,
         )?);
         ports.extend(parse_proc_net(
             "/proc/net/tcp6",
             Protocol::Tcp,
             true,
             &inode_pids,
+            &uid_map,
         )?);
         ports.extend(parse_proc_net(
             "/proc/net/udp",
             Protocol::Udp,
             false,
             &inode_pids,
+            &uid_map,
         )?);
         ports.extend(parse_proc_net(
             "/proc/net/udp6",
             Protocol::Udp,
             true,
             &inode_pids,
+            &uid_map,
         )?);
 
         for port in &mut ports {
@@ -97,6 +102,7 @@ fn parse_proc_net(
     protocol: Protocol,
     ipv6: bool,
     inode_pids: &HashMap<String, u32>,
+    uid_map: &HashMap<u32, String>,
 ) -> Result<Vec<RawPort>, ScanError> {
     let content = match fs::read_to_string(path) {
         Ok(c) => c,
@@ -154,7 +160,7 @@ fn parse_proc_net(
             },
         };
 
-        let user = uid.and_then(resolve_uid_to_username);
+        let user = uid.and_then(|u| uid_map.get(&u).cloned());
 
         ports.push(RawPort {
             port,
@@ -197,21 +203,24 @@ fn parse_remote_addr(addr_hex: &str, ipv6: bool) -> Option<String> {
     }
 }
 
-/// Resolve a UID to a username by parsing /etc/passwd.
-/// Returns None if the UID is not found or the file cannot be read.
-fn resolve_uid_to_username(uid: u32) -> Option<String> {
-    let content = fs::read_to_string("/etc/passwd").ok()?;
-    for line in content.lines() {
-        let parts: Vec<&str> = line.splitn(7, ':').collect();
-        if parts.len() >= 3 {
-            if let Ok(file_uid) = parts[2].parse::<u32>() {
-                if file_uid == uid {
-                    return Some(parts[0].to_string());
-                }
-            }
-        }
-    }
-    None
+fn load_uid_map() -> HashMap<u32, String> {
+    let Ok(content) = fs::read_to_string("/etc/passwd") else {
+        return HashMap::new();
+    };
+    parse_passwd_to_uid_map(&content)
+}
+
+fn parse_passwd_to_uid_map(content: &str) -> HashMap<u32, String> {
+    content
+        .lines()
+        .filter_map(|line| {
+            let mut parts = line.splitn(4, ':');
+            let name = parts.next()?;
+            parts.next(); // skip password field
+            let uid: u32 = parts.next()?.parse().ok()?;
+            Some((uid, name.to_string()))
+        })
+        .collect()
 }
 
 fn parse_state(hex: &str) -> Option<PortState> {
@@ -375,8 +384,7 @@ fn well_known_hint(port: u16) -> Option<&'static str> {
         28015 | 29015 => Some("rethinkdb"),
 
         // Caches / KV stores
-        6379 | 6380 => Some("redis"),
-        6381 => Some("redis"),
+        6379..=6381 => Some("redis"),
         11212 => Some("memcached"),
 
         // Message queues / streaming
@@ -574,14 +582,14 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("tcp");
         std::fs::write(&path, "  sl  local_address ...\n").unwrap();
-        let result = parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids);
+        let result = parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids, &HashMap::new());
         assert!(result.unwrap().is_empty());
     }
 
     #[test]
     fn parse_proc_net_missing_file() {
         let inode_pids = HashMap::new();
-        let result = parse_proc_net("/nonexistent/path", Protocol::Tcp, false, &inode_pids);
+        let result = parse_proc_net("/nonexistent/path", Protocol::Tcp, false, &inode_pids, &HashMap::new());
         assert!(result.unwrap().is_empty());
     }
 
@@ -591,7 +599,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("tcp");
         std::fs::write(&path, "header\nshort line\n").unwrap();
-        let result = parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids);
+        let result = parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids, &HashMap::new());
         assert!(result.unwrap().is_empty());
     }
 
@@ -603,7 +611,7 @@ mod tests {
         let line = "   0: 00000000:1F90 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 12345 1 0000000000000000 100 0 0 10 0";
         std::fs::write(&path, format!("  sl  local_address ...\n{}\n", line)).unwrap();
         let result =
-            parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids).unwrap();
+            parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids, &HashMap::new()).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].port, 8080);
         assert_eq!(result[0].state, PortState::Listen);
@@ -617,7 +625,7 @@ mod tests {
         let line = "   0: 00000000:0000 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 12345 1 0000000000000000 100 0 0 10 0";
         std::fs::write(&path, format!("header\n{}\n", line)).unwrap();
         let result =
-            parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids).unwrap();
+            parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids, &HashMap::new()).unwrap();
         assert!(result.is_empty());
     }
 
@@ -630,7 +638,7 @@ mod tests {
         let line = "   0: 00000000:0050 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 99999 1 0000000000000000 100 0 0 10 0";
         std::fs::write(&path, format!("header\n{}\n", line)).unwrap();
         let result =
-            parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids).unwrap();
+            parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids, &HashMap::new()).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].pid, 42);
         assert_eq!(result[0].port, 80);
@@ -647,7 +655,7 @@ mod tests {
         let line = "   0: 00000000:1F90 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 12345 1 0000000000000000 100 0 0 10 0";
         std::fs::write(&path, format!("header\n{}\n", line)).unwrap();
         let result =
-            parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids).unwrap();
+            parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids, &HashMap::new()).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].uid, Some(1000));
     }
@@ -655,15 +663,17 @@ mod tests {
     #[test]
     fn parse_proc_net_uid_zero_for_root() {
         let inode_pids = HashMap::new();
+        let uid_map = HashMap::from([(0, "root".to_string())]);
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("tcp");
         // UID 0 = root
         let line = "   0: 00000000:0016 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 11111 1 0000000000000000 100 0 0 10 0";
         std::fs::write(&path, format!("header\n{}\n", line)).unwrap();
         let result =
-            parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids).unwrap();
+            parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids, &uid_map).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].uid, Some(0));
+        assert_eq!(result[0].user, Some("root".to_string()));
     }
 
     // --- Remote address parsing ---
@@ -697,7 +707,7 @@ mod tests {
         let line = "   0: 0100007F:1F90 6401A8C0:01BB 01 00000000:00000000 00:00000000 00000000  1000        0 55555 1 0000000000000000 100 0 0 10 0";
         std::fs::write(&path, format!("header\n{}\n", line)).unwrap();
         let result =
-            parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids).unwrap();
+            parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids, &HashMap::new()).unwrap();
         assert_eq!(result.len(), 1);
         assert!(result[0].remote_addr.is_some());
         let remote = result[0].remote_addr.as_ref().unwrap();
@@ -713,50 +723,50 @@ mod tests {
         let line = "   0: 00000000:1F90 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 12345 1 0000000000000000 100 0 0 10 0";
         std::fs::write(&path, format!("header\n{}\n", line)).unwrap();
         let result =
-            parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids).unwrap();
+            parse_proc_net(path.to_str().unwrap(), Protocol::Tcp, false, &inode_pids, &HashMap::new()).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].remote_addr, None);
     }
 
-    // --- resolve_uid_to_username ---
+    // --- parse_passwd_to_uid_map ---
 
     #[test]
-    fn resolve_uid_to_username_finds_root() {
-        // root is always uid 0 in /etc/passwd on any Linux system
-        // We can only test this if /etc/passwd is readable (test env)
-        let username = resolve_uid_to_username(0);
-        if std::path::Path::new("/etc/passwd").exists() {
-            assert_eq!(username, Some("root".to_string()));
-        }
+    fn parse_passwd_finds_root() {
+        let content = "root:x:0:0:root:/root:/bin/bash\nnobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin\n";
+        let map = parse_passwd_to_uid_map(content);
+        assert_eq!(map.get(&0), Some(&"root".to_string()));
+        assert_eq!(map.get(&65534), Some(&"nobody".to_string()));
     }
 
     #[test]
-    fn resolve_uid_to_username_missing_uid_returns_none() {
-        // UID u32::MAX is extremely unlikely to exist
-        let username = resolve_uid_to_username(u32::MAX);
-        assert!(username.is_none());
+    fn parse_passwd_missing_uid_returns_none() {
+        let content = "root:x:0:0:root:/root:/bin/bash\n";
+        let map = parse_passwd_to_uid_map(content);
+        assert!(map.get(&9999).is_none());
     }
 
     #[test]
-    fn resolve_uid_from_mock_passwd() {
-        // Test the parsing logic with a temp file acting as /etc/passwd
-        // We can't override /etc/passwd, but we can test the parsing function directly
-        // by verifying the format logic using a manual parse test
-        let mock_passwd = "root:x:0:0:root:/root:/bin/bash\ndaemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\nalice:x:1000:1000:Alice:/home/alice:/bin/bash\n";
-        let uid_to_find: u32 = 1000;
-        // Simulate the parsing logic
-        let found = mock_passwd.lines().find_map(|line| {
-            let parts: Vec<&str> = line.splitn(7, ':').collect();
-            if parts.len() >= 3 {
-                if let Ok(file_uid) = parts[2].parse::<u32>() {
-                    if file_uid == uid_to_find {
-                        return Some(parts[0].to_string());
-                    }
-                }
-            }
-            None
-        });
-        assert_eq!(found, Some("alice".to_string()));
+    fn parse_passwd_resolves_multiple_users() {
+        let content = "root:x:0:0:root:/root:/bin/bash\ndaemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\nalice:x:1000:1000:Alice:/home/alice:/bin/bash\n";
+        let map = parse_passwd_to_uid_map(content);
+        assert_eq!(map.get(&0), Some(&"root".to_string()));
+        assert_eq!(map.get(&1), Some(&"daemon".to_string()));
+        assert_eq!(map.get(&1000), Some(&"alice".to_string()));
+    }
+
+    #[test]
+    fn parse_passwd_empty_content() {
+        let map = parse_passwd_to_uid_map("");
+        assert!(map.is_empty());
+    }
+
+    #[test]
+    fn parse_passwd_malformed_lines_skipped() {
+        let content = "root:x:0:0:root\nbadline\nalice:x:1000:1000:Alice:/home/alice:/bin/bash\n";
+        let map = parse_passwd_to_uid_map(content);
+        assert_eq!(map.get(&0), Some(&"root".to_string()));
+        assert_eq!(map.get(&1000), Some(&"alice".to_string()));
+        assert_eq!(map.len(), 2);
     }
 
     #[test]

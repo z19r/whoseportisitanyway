@@ -383,6 +383,18 @@ mod tests {
     }
 
     #[test]
+    fn render_user_fallback_when_process_name_empty() {
+        let mut app = test_app(1);
+        app.entries[0].process_name = String::new();
+        app.entries[0].user = Some("alice".to_string());
+        app.all_entries[0].process_name = String::new();
+        app.all_entries[0].user = Some("alice".to_string());
+        let backend = TestBackend::new(100, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(&app, frame)).unwrap();
+    }
+
+    #[test]
     fn render_both_states() {
         for st in [PortState::Listen, PortState::Established] {
             let mut app = test_app(1);
