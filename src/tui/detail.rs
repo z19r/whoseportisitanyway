@@ -10,19 +10,21 @@ pub(crate) fn build_search_url(entry: &PortEntry) -> String {
         "what is port {} {} {}",
         entry.port, entry.process_name, entry.classification
     );
-    // Encode the query: replace spaces with +, percent-encode non-URL-safe chars
-    let encoded: String = query
-        .chars()
-        .map(|c| match c {
-            ' ' => '+'.to_string(),
-            c if c.is_alphanumeric() || c == '-' || c == '_' || c == '.' => c.to_string(),
-            c => format!("%{:02X}", c as u32),
-        })
-        .collect();
+    let mut encoded = String::with_capacity(query.len() * 2);
+    for byte in query.bytes() {
+        match byte {
+            b' ' => encoded.push('+'),
+            b if b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b == b'.' => {
+                encoded.push(b as char)
+            }
+            b => encoded.push_str(&format!("%{b:02X}")),
+        }
+    }
     format!("https://www.google.com/search?q={encoded}")
 }
 
 pub(crate) fn open_in_browser(url: &str) {
+    // Fire-and-forget: silently ignores missing xdg-open/open.
     #[cfg(target_os = "linux")]
     let _ = std::process::Command::new("xdg-open").arg(url).spawn();
     #[cfg(target_os = "macos")]
@@ -230,10 +232,7 @@ pub fn render(app: &App, frame: &mut Frame) {
             lines.push(Line::from(""));
             lines.push(Line::from(vec![
                 Span::styled("Search: ", Style::default().fg(dim)),
-                Span::styled(
-                    search_url,
-                    Style::default().fg(Color::Rgb(100, 150, 255)),
-                ),
+                Span::styled(search_url, Style::default().fg(Color::Rgb(100, 150, 255))),
             ]));
 
             lines.push(Line::from(""));
@@ -544,8 +543,14 @@ mod tests {
         let url = build_search_url(&entry);
         // Extract just the query param value (after ?q=)
         let query_part = url.split("?q=").nth(1).expect("should have ?q=");
-        assert!(!query_part.contains('/'), "slash should be encoded in query");
-        assert!(!query_part.contains('&'), "ampersand should be encoded in query");
+        assert!(
+            !query_part.contains('/'),
+            "slash should be encoded in query"
+        );
+        assert!(
+            !query_part.contains('&'),
+            "ampersand should be encoded in query"
+        );
         assert!(query_part.contains("%2F"), "slash should be %2F");
         assert!(query_part.contains("%26"), "ampersand should be %26");
     }
