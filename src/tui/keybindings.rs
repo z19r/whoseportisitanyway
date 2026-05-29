@@ -27,6 +27,8 @@ pub fn handle_table_key(app: &mut App, key: KeyCode) {
         }
         KeyCode::Char('s') => app.cycle_sort(),
         KeyCode::Char('f') => app.cycle_filter(),
+        KeyCode::Char('h') => app.toggle_hide_system(),
+        KeyCode::Tab => app.cycle_group(),
         KeyCode::Char('r') => {
             let _ = app.refresh();
         }
@@ -38,6 +40,12 @@ pub fn handle_detail_key(app: &mut App, key: KeyCode) {
     match key {
         KeyCode::Char('q') | KeyCode::Esc => app.view = View::Table,
         KeyCode::Char('x') => app.view = View::Confirm,
+        KeyCode::Char('o') => {
+            if let Some(entry) = app.selected_entry() {
+                let url = super::detail::build_search_url(entry);
+                super::detail::open_in_browser(&url);
+            }
+        }
         _ => {}
     }
 }
@@ -77,6 +85,9 @@ mod tests {
                 local_addr: format!("0.0.0.0:{}", 3000 + i),
                 all_addrs: vec![format!("0.0.0.0:{}", 3000 + i)],
                 project: None,
+                uid: None,
+                user: None,
+                remote_addr: None,
             })
             .collect();
         App {
@@ -88,9 +99,12 @@ mod tests {
             watched_ports: vec![],
             sort_field: super::super::SortField::Port,
             filter: super::super::Filter::All,
+            group_field: super::super::GroupField::None,
+            group_labels: vec![],
             konami: super::super::KonamiDetector::new(),
             konami_mode: false,
             shuffle_remaining: 0,
+            hide_system: false,
         }
     }
 
@@ -242,6 +256,16 @@ mod tests {
     }
 
     #[test]
+    fn table_tab_cycles_group() {
+        let mut app = test_app(3);
+        assert_eq!(app.group_field, super::super::GroupField::None);
+        handle_table_key(&mut app, KeyCode::Tab);
+        assert_eq!(app.group_field, super::super::GroupField::Type);
+        handle_table_key(&mut app, KeyCode::Tab);
+        assert_eq!(app.group_field, super::super::GroupField::Project);
+    }
+
+    #[test]
     fn detail_q_back_to_table() {
         let mut app = test_app(3);
         app.view = View::Detail;
@@ -274,6 +298,23 @@ mod tests {
     }
 
     #[test]
+    fn detail_o_does_not_change_view() {
+        // 'o' triggers browser open but does not change the view
+        let mut app = test_app(3);
+        app.view = View::Detail;
+        handle_detail_key(&mut app, KeyCode::Char('o'));
+        assert_eq!(app.view, View::Detail);
+    }
+
+    #[test]
+    fn detail_o_on_empty_app_is_noop() {
+        let mut app = test_app(0);
+        app.view = View::Detail;
+        handle_detail_key(&mut app, KeyCode::Char('o'));
+        assert_eq!(app.view, View::Detail);
+    }
+
+    #[test]
     fn confirm_n_back_to_table() {
         let mut app = test_app(3);
         app.view = View::Confirm;
@@ -295,5 +336,15 @@ mod tests {
         app.view = View::Confirm;
         handle_confirm_key(&mut app, KeyCode::Char('z'));
         assert_eq!(app.view, View::Confirm);
+    }
+
+    #[test]
+    fn table_h_toggles_hide_system() {
+        let mut app = test_app(3);
+        assert!(!app.hide_system, "starts false");
+        handle_table_key(&mut app, KeyCode::Char('h'));
+        assert!(app.hide_system, "toggled to true");
+        handle_table_key(&mut app, KeyCode::Char('h'));
+        assert!(!app.hide_system, "toggled back to false");
     }
 }

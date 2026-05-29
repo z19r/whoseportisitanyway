@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use serde::Serialize;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum Protocol {
     Tcp,
     Udp,
@@ -158,6 +158,9 @@ pub struct RawPort {
     pub parent_pid: Option<u32>,
     pub parent_command_line: Option<String>,
     pub cwd: Option<PathBuf>,
+    pub uid: Option<u32>,
+    pub user: Option<String>,
+    pub remote_addr: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -180,6 +183,9 @@ pub struct PortEntry {
     pub local_addr: String,
     pub all_addrs: Vec<String>,
     pub ownership: Ownership,
+    pub uid: Option<u32>,
+    pub user: Option<String>,
+    pub remote_addr: Option<String>,
 }
 
 #[cfg(test)]
@@ -293,11 +299,39 @@ mod tests {
             parent_pid: Some(1),
             parent_command_line: None,
             cwd: None,
+            uid: Some(1000),
+            user: Some("alice".to_string()),
+            remote_addr: None,
         };
         let cloned = raw.clone();
         assert_eq!(cloned.port, 3000);
         assert_eq!(cloned.pid, 1234);
         assert_eq!(cloned.process_name, "node");
+        assert_eq!(cloned.uid, Some(1000));
+        assert_eq!(cloned.user, Some("alice".to_string()));
+        assert_eq!(cloned.remote_addr, None);
+    }
+
+    #[test]
+    fn raw_port_new_fields_none_by_default() {
+        let raw = RawPort {
+            port: 8080,
+            protocol: Protocol::Tcp,
+            pid: 0,
+            process_name: String::new(),
+            command_line: String::new(),
+            state: PortState::Listen,
+            local_addr: "0.0.0.0:8080".to_string(),
+            parent_pid: None,
+            parent_command_line: None,
+            cwd: None,
+            uid: None,
+            user: None,
+            remote_addr: None,
+        };
+        assert!(raw.uid.is_none());
+        assert!(raw.user.is_none());
+        assert!(raw.remote_addr.is_none());
     }
 
     #[test]
@@ -314,10 +348,41 @@ mod tests {
             local_addr: "0.0.0.0:8080".to_string(),
             all_addrs: vec!["0.0.0.0:8080".to_string()],
             ownership: Ownership::Untracked,
+            uid: Some(1000),
+            user: Some("developer".to_string()),
+            remote_addr: Some("192.168.1.1:54321".to_string()),
         };
         let json = serde_json::to_string(&entry).unwrap();
         assert!(json.contains("\"port\":8080"));
         assert!(json.contains("\"DevServer\""));
+        assert!(json.contains("\"uid\":1000"));
+        assert!(json.contains("\"developer\""));
+        assert!(json.contains("192.168.1.1:54321"));
+    }
+
+    #[test]
+    fn port_entry_serializes_with_null_new_fields() {
+        let entry = PortEntry {
+            port: 22,
+            protocol: Protocol::Tcp,
+            pid: 0,
+            process_name: "sshd".to_string(),
+            command_line: String::new(),
+            state: PortState::Listen,
+            classification: Classification::System,
+            project: None,
+            local_addr: "0.0.0.0:22".to_string(),
+            all_addrs: vec!["0.0.0.0:22".to_string()],
+            ownership: Ownership::Blocked,
+            uid: None,
+            user: None,
+            remote_addr: None,
+        };
+        let json = serde_json::to_string(&entry).unwrap();
+        assert!(json.contains("\"port\":22"));
+        assert!(json.contains("\"uid\":null"));
+        assert!(json.contains("\"user\":null"));
+        assert!(json.contains("\"remote_addr\":null"));
     }
 
     #[test]

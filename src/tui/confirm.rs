@@ -133,6 +133,9 @@ mod tests {
                 local_addr: format!("0.0.0.0:{}", 3000 + i),
                 all_addrs: vec![format!("0.0.0.0:{}", 3000 + i)],
                 project: None,
+                uid: None,
+                user: None,
+                remote_addr: None,
             })
             .collect();
         super::super::App {
@@ -144,9 +147,12 @@ mod tests {
             watched_ports: vec![],
             sort_field: super::super::SortField::Port,
             filter: super::super::Filter::All,
+            group_field: super::super::GroupField::None,
+            group_labels: vec![],
             konami: super::super::KonamiDetector::new(),
             konami_mode: false,
             shuffle_remaining: 0,
+            hide_system: false,
         }
     }
 

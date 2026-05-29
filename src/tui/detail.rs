@@ -3,6 +3,33 @@ use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 
 use super::style;
 use super::App;
+use crate::model::PortEntry;
+
+pub(crate) fn build_search_url(entry: &PortEntry) -> String {
+    let query = format!(
+        "what is port {} {} {}",
+        entry.port, entry.process_name, entry.classification
+    );
+    let mut encoded = String::with_capacity(query.len() * 2);
+    for byte in query.bytes() {
+        match byte {
+            b' ' => encoded.push('+'),
+            b if b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b == b'.' => {
+                encoded.push(b as char)
+            }
+            b => encoded.push_str(&format!("%{b:02X}")),
+        }
+    }
+    format!("https://www.google.com/search?q={encoded}")
+}
+
+pub(crate) fn open_in_browser(url: &str) {
+    // Fire-and-forget: silently ignores missing xdg-open/open.
+    #[cfg(target_os = "linux")]
+    let _ = std::process::Command::new("xdg-open").arg(url).spawn();
+    #[cfg(target_os = "macos")]
+    let _ = std::process::Command::new("open").arg(url).spawn();
+}
 
 pub fn render(app: &App, frame: &mut Frame) {
     let wild = app.konami_mode;
@@ -98,6 +125,48 @@ pub fn render(app: &App, frame: &mut Frame) {
                 ]));
             }
 
+            // Show user info if available (works even without root/pid)
+            if let Some(ref user) = entry.user {
+                lines.push(Line::from(vec![
+                    Span::styled("User: ", Style::default().fg(dim)),
+                    Span::styled(
+                        user.clone(),
+                        Style::default().fg(if wild {
+                            style::wild_dim(5)
+                        } else {
+                            Color::Rgb(100, 220, 180)
+                        }),
+                    ),
+                ]));
+            } else if let Some(uid) = entry.uid {
+                lines.push(Line::from(vec![
+                    Span::styled("UID: ", Style::default().fg(dim)),
+                    Span::styled(
+                        uid.to_string(),
+                        Style::default().fg(if wild {
+                            style::wild_dim(5)
+                        } else {
+                            Color::Rgb(100, 220, 180)
+                        }),
+                    ),
+                ]));
+            }
+
+            // Show remote address for established connections
+            if let Some(ref remote) = entry.remote_addr {
+                lines.push(Line::from(vec![
+                    Span::styled("Remote: ", Style::default().fg(dim)),
+                    Span::styled(
+                        remote.clone(),
+                        Style::default().fg(if wild {
+                            style::wild_dim(6)
+                        } else {
+                            Color::Rgb(255, 160, 80)
+                        }),
+                    ),
+                ]));
+            }
+
             lines.extend(vec![
                 Line::from(vec![
                     Span::styled("State: ", Style::default().fg(dim)),
@@ -159,12 +228,21 @@ pub fn render(app: &App, frame: &mut Frame) {
                 ]));
             }
 
+            let search_url = build_search_url(entry);
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![
+                Span::styled("Search: ", Style::default().fg(dim)),
+                Span::styled(search_url, Style::default().fg(Color::Rgb(100, 150, 255))),
+            ]));
+
             lines.push(Line::from(""));
             lines.push(Line::from(vec![
                 Span::styled(" Esc", Style::default().fg(style::STATUS_KEY).bold()),
                 Span::styled(" back  ", Style::default().fg(style::STATUS_FG)),
                 Span::styled("x", Style::default().fg(style::STATUS_KEY).bold()),
-                Span::styled(" kill", Style::default().fg(style::STATUS_FG)),
+                Span::styled(" kill  ", Style::default().fg(style::STATUS_FG)),
+                Span::styled("o", Style::default().fg(style::STATUS_KEY).bold()),
+                Span::styled(" search", Style::default().fg(style::STATUS_FG)),
             ]));
 
             lines
@@ -245,6 +323,9 @@ mod tests {
                 local_addr: format!("0.0.0.0:{}", 3000 + i),
                 all_addrs: vec![format!("0.0.0.0:{}", 3000 + i)],
                 project: None,
+                uid: None,
+                user: None,
+                remote_addr: None,
             })
             .collect();
         super::super::App {
@@ -256,9 +337,12 @@ mod tests {
             watched_ports: vec![],
             sort_field: super::super::SortField::Port,
             filter: super::super::Filter::All,
+            group_field: super::super::GroupField::None,
+            group_labels: vec![],
             konami: super::super::KonamiDetector::new(),
             konami_mode: false,
             shuffle_remaining: 0,
+            hide_system: false,
         }
     }
 
@@ -328,6 +412,58 @@ mod tests {
     }
 
     #[test]
+    fn render_with_user_info_no_panic() {
+        let mut app = test_app(1);
+        app.entries[0].uid = Some(1000);
+        app.entries[0].user = Some("alice".into());
+        let backend = TestBackend::new(80, 35);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(&app, frame)).unwrap();
+    }
+
+    #[test]
+    fn render_with_uid_only_no_panic() {
+        let mut app = test_app(1);
+        app.entries[0].uid = Some(0);
+        app.entries[0].user = None;
+        let backend = TestBackend::new(80, 35);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(&app, frame)).unwrap();
+    }
+
+    #[test]
+    fn render_with_remote_addr_no_panic() {
+        let mut app = test_app(1);
+        app.entries[0].remote_addr = Some("192.168.1.100:54321".into());
+        let backend = TestBackend::new(80, 35);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(&app, frame)).unwrap();
+    }
+
+    #[test]
+    fn render_with_all_new_fields_no_panic() {
+        let mut app = test_app(1);
+        app.entries[0].uid = Some(1000);
+        app.entries[0].user = Some("developer".into());
+        app.entries[0].remote_addr = Some("10.0.0.1:443".into());
+        let backend = TestBackend::new(80, 40);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(&app, frame)).unwrap();
+    }
+
+    #[test]
+    fn render_with_all_new_fields_wild_no_panic() {
+        let mut app = test_app(1);
+        app.konami_mode = true;
+        app.entries[0].uid = Some(1000);
+        app.entries[0].user = Some("developer".into());
+        app.entries[0].remote_addr = Some("10.0.0.1:443".into());
+        let backend = TestBackend::new(80, 40);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(&app, frame)).unwrap();
+    }
+
+    #[test]
     fn render_wild_with_project() {
         let mut app = test_app(1);
         app.konami_mode = true;
@@ -349,5 +485,100 @@ mod tests {
         assert!(inner.height > 0);
         assert!(inner.x > 0);
         assert!(inner.y > 0);
+    }
+
+    fn make_entry(port: u16, process_name: &str, classification: Classification) -> PortEntry {
+        PortEntry {
+            port,
+            protocol: Protocol::Tcp,
+            pid: 1234,
+            process_name: process_name.to_string(),
+            command_line: format!("{process_name} --serve"),
+            classification,
+            ownership: Ownership::Untracked,
+            state: PortState::Listen,
+            local_addr: format!("0.0.0.0:{port}"),
+            all_addrs: vec![format!("0.0.0.0:{port}")],
+            project: None,
+            uid: None,
+            user: None,
+            remote_addr: None,
+        }
+    }
+
+    #[test]
+    fn build_search_url_produces_correct_url() {
+        let entry = make_entry(3000, "node", Classification::DevServer);
+        let url = build_search_url(&entry);
+        assert!(url.starts_with("https://www.google.com/search?q="));
+        assert!(url.contains("3000"));
+        assert!(url.contains("node"));
+        // spaces replaced with +
+        assert!(!url.contains(' '));
+    }
+
+    #[test]
+    fn build_search_url_contains_all_parts() {
+        let entry = make_entry(5432, "postgres", Classification::Database);
+        let url = build_search_url(&entry);
+        assert!(url.contains("5432"));
+        assert!(url.contains("postgres"));
+        // classification display is "Database"
+        assert!(url.contains("Database"));
+    }
+
+    #[test]
+    fn build_search_url_spaces_encoded_as_plus() {
+        // Classification::DevServer displays as "Dev Server" which has a space
+        let entry = make_entry(3001, "vite", Classification::DevServer);
+        let url = build_search_url(&entry);
+        assert!(!url.contains(' '));
+        assert!(url.contains('+'));
+    }
+
+    #[test]
+    fn build_search_url_handles_special_chars_in_process_name() {
+        // Process names with special chars should be percent-encoded in the query part
+        let entry = make_entry(8080, "my/proc&name", Classification::Unknown);
+        let url = build_search_url(&entry);
+        // Extract just the query param value (after ?q=)
+        let query_part = url.split("?q=").nth(1).expect("should have ?q=");
+        assert!(
+            !query_part.contains('/'),
+            "slash should be encoded in query"
+        );
+        assert!(
+            !query_part.contains('&'),
+            "ampersand should be encoded in query"
+        );
+        assert!(query_part.contains("%2F"), "slash should be %2F");
+        assert!(query_part.contains("%26"), "ampersand should be %26");
+    }
+
+    #[test]
+    fn build_search_url_format_is_valid_https() {
+        let entry = make_entry(80, "nginx", Classification::Proxy);
+        let url = build_search_url(&entry);
+        assert!(url.starts_with("https://www.google.com/search?q="));
+        // No bare spaces — URL is safe to pass to a browser
+        assert!(!url.contains(' '));
+    }
+
+    #[test]
+    fn open_in_browser_is_callable() {
+        // We can't verify a browser opens, but the function must not panic or crash
+        // when called with a valid URL string.
+        let url = "https://www.google.com/search?q=test";
+        // Just verify it compiles and runs without panic.
+        // On Linux it will attempt xdg-open; on macOS `open`. The call is fire-and-forget.
+        open_in_browser(url);
+    }
+
+    #[test]
+    fn render_with_search_url_no_panic() {
+        let app = test_app(1);
+        let backend = TestBackend::new(120, 40);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(&app, frame)).unwrap();
     }
 }

@@ -55,6 +55,9 @@ mod tests {
             local_addr: addr.to_string(),
             all_addrs: vec![addr.to_string()],
             ownership: Ownership::Untracked,
+            uid: None,
+            user: None,
+            remote_addr: None,
         }
     }
 
