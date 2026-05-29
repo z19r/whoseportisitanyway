@@ -14,70 +14,114 @@ pub fn render(app: &App, frame: &mut Frame) {
 fn render_table(app: &App, frame: &mut Frame, area: Rect) {
     let wild = app.konami_mode;
 
-    let rows: Vec<Row> = app
-        .entries
-        .iter()
-        .enumerate()
-        .map(|(i, e)| {
-            let type_color = if wild {
-                style::classification_color_wild(&e.classification, i)
-            } else {
-                style::classification_color(&e.classification)
-            };
-            let state_color = if wild {
-                style::state_color_wild(&e.state, i)
-            } else {
-                style::state_color(&e.state)
-            };
-            let own_style = if wild {
-                style::ownership_style_wild(&e.ownership, i)
-            } else {
-                style::ownership_style(&e.ownership)
-            };
-            let port_color = if wild {
-                style::port_color_wild(e.port, i)
-            } else {
-                style::port_color(e.port)
-            };
-            let dim = if wild { style::wild_dim(i) } else { style::DIM };
-            let name_color = if wild {
-                style::wild_dim(i + 50)
-            } else {
-                Color::White
-            };
-            let proj_color = if wild {
-                style::wild_dim(i + 100)
-            } else {
-                Color::Rgb(180, 160, 220)
-            };
+    let grouping_active = app.group_field != super::GroupField::None;
 
-            // When pid=0 (blocked process), show user info as fallback
-            let display_name = if e.process_name.is_empty() {
-                if let Some(ref user) = e.user {
-                    format!("[{}]", user)
+    let mut rows: Vec<Row> = Vec::new();
+    let mut visual_selected: Option<usize> = None;
+    let mut visual_row_idx: usize = 0;
+
+    for (i, e) in app.entries.iter().enumerate() {
+        // Insert a group header row when the group label changes.
+        if grouping_active {
+            let current_label = app.group_labels.get(i).map(|s| s.as_str()).unwrap_or("");
+            let prev_label = if i > 0 {
+                app.group_labels.get(i - 1).map(|s| s.as_str()).unwrap_or("")
+            } else {
+                ""
+            };
+            if i == 0 || current_label != prev_label {
+                let header_style = if wild {
+                    Style::default()
+                        .fg(Color::White)
+                        .bg(style::wild_header_bg())
+                        .bold()
+                        .italic()
                 } else {
-                    "—".to_string()
-                }
-            } else {
-                e.process_name.clone()
-            };
+                    Style::default()
+                        .fg(Color::Rgb(200, 180, 255))
+                        .bold()
+                        .italic()
+                };
+                let header_row = Row::new(vec![
+                    Cell::from(format!("  \u{25B8} {current_label}"))
+                        .style(header_style),
+                    Cell::from(""),
+                    Cell::from(""),
+                    Cell::from(""),
+                    Cell::from(""),
+                    Cell::from(""),
+                    Cell::from(""),
+                    Cell::from(""),
+                ]);
+                rows.push(header_row);
+                visual_row_idx += 1;
+            }
+        }
 
-            Row::new(vec![
-                Cell::from(format!(" {:>7}", e.pid)).style(Style::default().fg(dim)),
-                Cell::from(format!("{:>5}", e.port)).style(Style::default().fg(port_color).bold()),
-                Cell::from(format!(" {:<5}", e.protocol)).style(Style::default().fg(dim)),
-                Cell::from(format!(" {}", display_name)).style(Style::default().fg(name_color)),
-                Cell::from(format!(" {}", e.classification)).style(Style::default().fg(type_color)),
-                Cell::from(format!(
-                    " {}",
-                    e.project.as_ref().map(|p| p.name.as_str()).unwrap_or("—")
-                ))
-                .style(Style::default().fg(proj_color)),
-                Cell::from(format!(" {}", e.ownership)).style(own_style),
-                Cell::from(format!(" {}", e.state)).style(Style::default().fg(state_color)),
-            ])
-        })
-        .collect();
+        if i == app.selected {
+            visual_selected = Some(visual_row_idx);
+        }
+
+        let type_color = if wild {
+            style::classification_color_wild(&e.classification, i)
+        } else {
+            style::classification_color(&e.classification)
+        };
+        let state_color = if wild {
+            style::state_color_wild(&e.state, i)
+        } else {
+            style::state_color(&e.state)
+        };
+        let own_style = if wild {
+            style::ownership_style_wild(&e.ownership, i)
+        } else {
+            style::ownership_style(&e.ownership)
+        };
+        let port_color = if wild {
+            style::port_color_wild(e.port, i)
+        } else {
+            style::port_color(e.port)
+        };
+        let dim = if wild { style::wild_dim(i) } else { style::DIM };
+        let name_color = if wild {
+            style::wild_dim(i + 50)
+        } else {
+            Color::White
+        };
+        let proj_color = if wild {
+            style::wild_dim(i + 100)
+        } else {
+            Color::Rgb(180, 160, 220)
+        };
+
+        // When pid=0 (blocked process), show user info as fallback
+        let display_name = if e.process_name.is_empty() {
+            if let Some(ref user) = e.user {
+                format!("[{}]", user)
+            } else {
+                "—".to_string()
+            }
+        } else {
+            e.process_name.clone()
+        };
+
+        let row = Row::new(vec![
+            Cell::from(format!(" {:>7}", e.pid)).style(Style::default().fg(dim)),
+            Cell::from(format!("{:>5}", e.port)).style(Style::default().fg(port_color).bold()),
+            Cell::from(format!(" {:<5}", e.protocol)).style(Style::default().fg(dim)),
+            Cell::from(format!(" {}", display_name)).style(Style::default().fg(name_color)),
+            Cell::from(format!(" {}", e.classification)).style(Style::default().fg(type_color)),
+            Cell::from(format!(
+                " {}",
+                e.project.as_ref().map(|p| p.name.as_str()).unwrap_or("—")
+            ))
+            .style(Style::default().fg(proj_color)),
+            Cell::from(format!(" {}", e.ownership)).style(own_style),
+            Cell::from(format!(" {}", e.state)).style(Style::default().fg(state_color)),
+        ]);
+        rows.push(row);
+        visual_row_idx += 1;
+    }
 
     let header_style = if wild {
         Style::default()
@@ -181,10 +225,18 @@ fn render_table(app: &App, frame: &mut Frame, area: Rect) {
         )
         .row_highlight_style(highlight);
 
+    // When grouping, use the visual row index (which accounts for header rows);
+    // otherwise fall back to the logical entry index.
+    let highlight_idx = if grouping_active {
+        visual_selected
+    } else {
+        if app.entries.is_empty() { None } else { Some(app.selected) }
+    };
+
     frame.render_stateful_widget(
         table,
         area,
-        &mut ratatui::widgets::TableState::default().with_selected(Some(app.selected)),
+        &mut ratatui::widgets::TableState::default().with_selected(highlight_idx),
     );
 }
 
@@ -203,6 +255,12 @@ fn render_status_bar(app: &App, frame: &mut Frame, area: Rect) {
         style::STATUS_FG
     };
 
+    let group_color = if app.group_field != super::GroupField::None {
+        Color::Rgb(180, 255, 180)
+    } else {
+        style::STATUS_FG
+    };
+
     let spans = vec![
         key("j/k"),
         label(" nav  "),
@@ -216,6 +274,11 @@ fn render_status_bar(app: &App, frame: &mut Frame, area: Rect) {
         Span::styled(
             format!(" filter:{} ", app.filter.label()),
             Style::default().fg(filter_color),
+        ),
+        key("Tab"),
+        Span::styled(
+            format!(" group:{} ", app.group_field.label()),
+            Style::default().fg(group_color),
         ),
         key("r"),
         label(" refresh  "),
@@ -264,6 +327,8 @@ mod tests {
             watched_ports: vec![],
             sort_field: super::super::SortField::Port,
             filter: super::super::Filter::All,
+            group_field: super::super::GroupField::None,
+            group_labels: vec![],
             konami: super::super::KonamiDetector::new(),
             konami_mode: false,
             shuffle_remaining: 0,
@@ -404,5 +469,48 @@ mod tests {
             let mut terminal = Terminal::new(backend).unwrap();
             terminal.draw(|frame| render(&app, frame)).unwrap();
         }
+    }
+
+    #[test]
+    fn render_with_group_field_no_panic() {
+        let mut app = test_app(3);
+        app.group_field = super::super::GroupField::Type;
+        app.group_labels = app
+            .entries
+            .iter()
+            .map(|e| e.classification.to_string())
+            .collect();
+        let backend = TestBackend::new(100, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(&app, frame)).unwrap();
+    }
+
+    #[test]
+    fn render_with_group_field_state_no_panic() {
+        let mut app = test_app(3);
+        app.group_field = super::super::GroupField::State;
+        app.group_labels = app
+            .entries
+            .iter()
+            .map(|e| e.state.to_string())
+            .collect();
+        let backend = TestBackend::new(100, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(&app, frame)).unwrap();
+    }
+
+    #[test]
+    fn render_with_group_field_wild_no_panic() {
+        let mut app = test_app(3);
+        app.konami_mode = true;
+        app.group_field = super::super::GroupField::Process;
+        app.group_labels = app
+            .entries
+            .iter()
+            .map(|e| e.process_name.clone())
+            .collect();
+        let backend = TestBackend::new(100, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(&app, frame)).unwrap();
     }
 }

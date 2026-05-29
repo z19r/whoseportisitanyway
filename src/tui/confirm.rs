@@ -147,6 +147,8 @@ mod tests {
             watched_ports: vec![],
             sort_field: super::super::SortField::Port,
             filter: super::super::Filter::All,
+            group_field: super::super::GroupField::None,
+            group_labels: vec![],
             konami: super::super::KonamiDetector::new(),
             konami_mode: false,
             shuffle_remaining: 0,

@@ -157,6 +157,51 @@ impl Filter {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GroupField {
+    None,
+    Type,
+    Project,
+    Process,
+    State,
+}
+
+impl GroupField {
+    pub fn next(self) -> Self {
+        match self {
+            Self::None => Self::Type,
+            Self::Type => Self::Project,
+            Self::Project => Self::Process,
+            Self::Process => Self::State,
+            Self::State => Self::None,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Type => "type",
+            Self::Project => "project",
+            Self::Process => "process",
+            Self::State => "state",
+        }
+    }
+
+    pub fn group_key(self, entry: &PortEntry) -> String {
+        match self {
+            Self::None => String::new(),
+            Self::Type => entry.classification.to_string(),
+            Self::Project => entry
+                .project
+                .as_ref()
+                .map(|p| p.name.clone())
+                .unwrap_or_else(|| "\u{2014}".to_string()),
+            Self::Process => entry.process_name.clone(),
+            Self::State => entry.state.to_string(),
+        }
+    }
+}
+
 pub struct App {
     all_entries: Vec<PortEntry>,
     entries: Vec<PortEntry>,
@@ -166,6 +211,10 @@ pub struct App {
     watched_ports: Vec<u16>,
     sort_field: SortField,
     filter: Filter,
+    pub group_field: GroupField,
+    /// Group label for each entry in `entries`. When adjacent labels differ,
+    /// the table renderer inserts a visual group-header row.
+    pub group_labels: Vec<String>,
     pub konami: KonamiDetector,
     pub konami_mode: bool,
     shuffle_remaining: u8,
@@ -182,6 +231,8 @@ impl App {
             watched_ports,
             sort_field: SortField::Port,
             filter: Filter::All,
+            group_field: GroupField::None,
+            group_labels: Vec::new(),
             konami: KonamiDetector::new(),
             konami_mode: false,
             shuffle_remaining: 0,
@@ -270,6 +321,19 @@ impl App {
             SortField::State => filtered.sort_by_key(|e| e.state.to_string()),
         }
 
+        // When grouping is active, stable-sort by group key so that the
+        // within-group order established above is preserved.
+        if self.group_field != GroupField::None {
+            let gf = self.group_field;
+            filtered.sort_by_key(|a| gf.group_key(a));
+        }
+
+        // Build the group_labels vec — one entry per row, mirroring `filtered`.
+        self.group_labels = filtered
+            .iter()
+            .map(|e| self.group_field.group_key(e))
+            .collect();
+
         self.entries = filtered;
         if self.selected >= self.entries.len() && !self.entries.is_empty() {
             self.selected = self.entries.len() - 1;
@@ -286,6 +350,12 @@ impl App {
 
     fn cycle_filter(&mut self) {
         self.filter = self.filter.next();
+        self.selected = 0;
+        self.apply_filter_sort();
+    }
+
+    fn cycle_group(&mut self) {
+        self.group_field = self.group_field.next();
         self.selected = 0;
         self.apply_filter_sort();
     }
@@ -733,5 +803,312 @@ mod tests {
         app.check_modal_validity(3000, &Protocol::Tcp, 100);
 
         assert_eq!(app.view, View::Table);
+    }
+
+    // ---- GroupField tests ----
+
+    #[test]
+    fn group_field_cycles_through_all() {
+        let mut gf = GroupField::None;
+        let mut seen = vec![gf];
+        for _ in 0..4 {
+            gf = gf.next();
+            seen.push(gf);
+        }
+        // After 5 steps should be back to None
+        assert_eq!(gf.next(), GroupField::None);
+        assert_eq!(
+            seen,
+            vec![
+                GroupField::None,
+                GroupField::Type,
+                GroupField::Project,
+                GroupField::Process,
+                GroupField::State,
+            ]
+        );
+    }
+
+    #[test]
+    fn group_field_labels() {
+        assert_eq!(GroupField::None.label(), "none");
+        assert_eq!(GroupField::Type.label(), "type");
+        assert_eq!(GroupField::Project.label(), "project");
+        assert_eq!(GroupField::Process.label(), "process");
+        assert_eq!(GroupField::State.label(), "state");
+    }
+
+    #[test]
+    fn group_field_group_key_none_is_empty() {
+        let entry = make_entry(Classification::DevServer, PortState::Listen);
+        assert_eq!(GroupField::None.group_key(&entry), "");
+    }
+
+    #[test]
+    fn group_field_group_key_type() {
+        let entry = make_entry(Classification::Database, PortState::Listen);
+        assert_eq!(GroupField::Type.group_key(&entry), "Database");
+    }
+
+    #[test]
+    fn group_field_group_key_project_some() {
+        use crate::model::Project;
+        let mut entry = make_entry(Classification::DevServer, PortState::Listen);
+        entry.project = Some(Project {
+            name: "myapp".into(),
+            root: "/tmp/myapp".into(),
+            framework: None,
+        });
+        assert_eq!(GroupField::Project.group_key(&entry), "myapp");
+    }
+
+    #[test]
+    fn group_field_group_key_project_none() {
+        let entry = make_entry(Classification::DevServer, PortState::Listen);
+        // No project — should return em-dash placeholder
+        assert_eq!(GroupField::Project.group_key(&entry), "\u{2014}");
+    }
+
+    #[test]
+    fn group_field_group_key_process() {
+        use crate::model::{Ownership, Protocol};
+        let entry = PortEntry {
+            port: 3000,
+            protocol: Protocol::Tcp,
+            pid: 100,
+            process_name: "node".into(),
+            command_line: "node index.js".into(),
+            state: PortState::Listen,
+            classification: Classification::DevServer,
+            project: None,
+            local_addr: "127.0.0.1:3000".into(),
+            all_addrs: vec!["127.0.0.1:3000".into()],
+            ownership: Ownership::Untracked,
+            uid: None,
+            user: None,
+            remote_addr: None,
+        };
+        assert_eq!(GroupField::Process.group_key(&entry), "node");
+    }
+
+    #[test]
+    fn group_field_group_key_state() {
+        let listen = make_entry(Classification::DevServer, PortState::Listen);
+        let est = make_entry(Classification::DevServer, PortState::Established);
+        assert_eq!(GroupField::State.group_key(&listen), "LISTEN");
+        assert_eq!(GroupField::State.group_key(&est), "ESTABLISHED");
+    }
+
+    #[test]
+    fn apply_filter_sort_groups_entries_by_type() {
+        use crate::model::{Ownership, Protocol};
+        let mut app = App::new(vec![]);
+        // Mix of DevServer and Database entries — without grouping they'd sort by port
+        app.all_entries = vec![
+            PortEntry {
+                port: 5432,
+                protocol: Protocol::Tcp,
+                pid: 1,
+                process_name: "postgres".into(),
+                command_line: "postgres".into(),
+                state: PortState::Listen,
+                classification: Classification::Database,
+                project: None,
+                local_addr: "127.0.0.1:5432".into(),
+                all_addrs: vec![],
+                ownership: Ownership::Untracked,
+                uid: None,
+                user: None,
+                remote_addr: None,
+            },
+            PortEntry {
+                port: 3000,
+                protocol: Protocol::Tcp,
+                pid: 2,
+                process_name: "node".into(),
+                command_line: "node".into(),
+                state: PortState::Listen,
+                classification: Classification::DevServer,
+                project: None,
+                local_addr: "127.0.0.1:3000".into(),
+                all_addrs: vec![],
+                ownership: Ownership::Untracked,
+                uid: None,
+                user: None,
+                remote_addr: None,
+            },
+            PortEntry {
+                port: 5433,
+                protocol: Protocol::Tcp,
+                pid: 3,
+                process_name: "postgres2".into(),
+                command_line: "postgres2".into(),
+                state: PortState::Listen,
+                classification: Classification::Database,
+                project: None,
+                local_addr: "127.0.0.1:5433".into(),
+                all_addrs: vec![],
+                ownership: Ownership::Untracked,
+                uid: None,
+                user: None,
+                remote_addr: None,
+            },
+        ];
+        app.group_field = GroupField::Type;
+        app.apply_filter_sort();
+
+        // All Database entries should come before DevServer (alphabetical: "Database" < "Dev Server")
+        let labels: Vec<&str> = app.group_labels.iter().map(|s| s.as_str()).collect();
+        assert_eq!(labels[0], labels[1], "first two entries should share a group");
+        assert_ne!(labels[1], labels[2], "third entry should be in a different group");
+        // Verify the actual groups
+        assert_eq!(app.entries[0].classification, Classification::Database);
+        assert_eq!(app.entries[1].classification, Classification::Database);
+        assert_eq!(app.entries[2].classification, Classification::DevServer);
+    }
+
+    #[test]
+    fn apply_filter_sort_groups_preserve_sort_within_group() {
+        use crate::model::{Ownership, Protocol};
+        let mut app = App::new(vec![]);
+        // Two database entries — port sort within group should keep 5432 before 5433
+        app.all_entries = vec![
+            PortEntry {
+                port: 5433,
+                protocol: Protocol::Tcp,
+                pid: 2,
+                process_name: "pg2".into(),
+                command_line: "pg2".into(),
+                state: PortState::Listen,
+                classification: Classification::Database,
+                project: None,
+                local_addr: "127.0.0.1:5433".into(),
+                all_addrs: vec![],
+                ownership: Ownership::Untracked,
+                uid: None,
+                user: None,
+                remote_addr: None,
+            },
+            PortEntry {
+                port: 5432,
+                protocol: Protocol::Tcp,
+                pid: 1,
+                process_name: "pg1".into(),
+                command_line: "pg1".into(),
+                state: PortState::Listen,
+                classification: Classification::Database,
+                project: None,
+                local_addr: "127.0.0.1:5432".into(),
+                all_addrs: vec![],
+                ownership: Ownership::Untracked,
+                uid: None,
+                user: None,
+                remote_addr: None,
+            },
+        ];
+        app.sort_field = SortField::Port;
+        app.group_field = GroupField::Type;
+        app.apply_filter_sort();
+
+        // Both are Database; within-group order should be by port ascending
+        assert_eq!(app.entries[0].port, 5432);
+        assert_eq!(app.entries[1].port, 5433);
+    }
+
+    #[test]
+    fn group_labels_len_matches_entries_len() {
+        use crate::model::{Ownership, Protocol};
+        let mut app = App::new(vec![]);
+        app.all_entries = vec![
+            PortEntry {
+                port: 3000,
+                protocol: Protocol::Tcp,
+                pid: 1,
+                process_name: "node".into(),
+                command_line: "node".into(),
+                state: PortState::Listen,
+                classification: Classification::DevServer,
+                project: None,
+                local_addr: "127.0.0.1:3000".into(),
+                all_addrs: vec![],
+                ownership: Ownership::Untracked,
+                uid: None,
+                user: None,
+                remote_addr: None,
+            },
+            PortEntry {
+                port: 5432,
+                protocol: Protocol::Tcp,
+                pid: 2,
+                process_name: "postgres".into(),
+                command_line: "postgres".into(),
+                state: PortState::Listen,
+                classification: Classification::Database,
+                project: None,
+                local_addr: "127.0.0.1:5432".into(),
+                all_addrs: vec![],
+                ownership: Ownership::Untracked,
+                uid: None,
+                user: None,
+                remote_addr: None,
+            },
+        ];
+        app.group_field = GroupField::Process;
+        app.apply_filter_sort();
+
+        assert_eq!(app.group_labels.len(), app.entries.len());
+    }
+
+    #[test]
+    fn group_labels_empty_when_no_entries() {
+        let mut app = App::new(vec![]);
+        app.group_field = GroupField::Type;
+        app.apply_filter_sort();
+        assert!(app.group_labels.is_empty());
+    }
+
+    #[test]
+    fn app_new_defaults_group_field() {
+        let app = App::new(vec![]);
+        assert_eq!(app.group_field, GroupField::None);
+        assert!(app.group_labels.is_empty());
+    }
+
+    #[test]
+    fn app_cycle_group() {
+        let mut app = App::new(vec![]);
+        assert_eq!(app.group_field, GroupField::None);
+        app.cycle_group();
+        assert_eq!(app.group_field, GroupField::Type);
+        app.cycle_group();
+        assert_eq!(app.group_field, GroupField::Project);
+    }
+
+    #[test]
+    fn app_cycle_group_resets_selected() {
+        use crate::model::{Ownership, Protocol};
+        let mut app = App::new(vec![]);
+        app.all_entries = vec![
+            PortEntry {
+                port: 3000,
+                protocol: Protocol::Tcp,
+                pid: 1,
+                process_name: "node".into(),
+                command_line: "node".into(),
+                state: PortState::Listen,
+                classification: Classification::DevServer,
+                project: None,
+                local_addr: "127.0.0.1:3000".into(),
+                all_addrs: vec![],
+                ownership: Ownership::Untracked,
+                uid: None,
+                user: None,
+                remote_addr: None,
+            },
+        ];
+        app.apply_filter_sort();
+        app.selected = 0;
+        app.cycle_group();
+        assert_eq!(app.selected, 0, "selected should reset to 0 on group cycle");
     }
 }

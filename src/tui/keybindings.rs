@@ -27,6 +27,7 @@ pub fn handle_table_key(app: &mut App, key: KeyCode) {
         }
         KeyCode::Char('s') => app.cycle_sort(),
         KeyCode::Char('f') => app.cycle_filter(),
+        KeyCode::Tab => app.cycle_group(),
         KeyCode::Char('r') => {
             let _ = app.refresh();
         }
@@ -91,6 +92,8 @@ mod tests {
             watched_ports: vec![],
             sort_field: super::super::SortField::Port,
             filter: super::super::Filter::All,
+            group_field: super::super::GroupField::None,
+            group_labels: vec![],
             konami: super::super::KonamiDetector::new(),
             konami_mode: false,
             shuffle_remaining: 0,
@@ -242,6 +245,16 @@ mod tests {
         let mut app = test_app(0);
         handle_table_key(&mut app, KeyCode::Char('x'));
         assert_eq!(app.view, View::Table);
+    }
+
+    #[test]
+    fn table_tab_cycles_group() {
+        let mut app = test_app(3);
+        assert_eq!(app.group_field, super::super::GroupField::None);
+        handle_table_key(&mut app, KeyCode::Tab);
+        assert_eq!(app.group_field, super::super::GroupField::Type);
+        handle_table_key(&mut app, KeyCode::Tab);
+        assert_eq!(app.group_field, super::super::GroupField::Project);
     }
 
     #[test]
