@@ -27,6 +27,7 @@ pub fn handle_table_key(app: &mut App, key: KeyCode) {
         }
         KeyCode::Char('s') => app.cycle_sort(),
         KeyCode::Char('f') => app.cycle_filter(),
+        KeyCode::Char('h') => app.toggle_hide_system(),
         KeyCode::Tab => app.cycle_group(),
         KeyCode::Char('r') => {
             let _ = app.refresh();
@@ -97,6 +98,7 @@ mod tests {
             konami: super::super::KonamiDetector::new(),
             konami_mode: false,
             shuffle_remaining: 0,
+            hide_system: false,
         }
     }
 
@@ -311,5 +313,15 @@ mod tests {
         app.view = View::Confirm;
         handle_confirm_key(&mut app, KeyCode::Char('z'));
         assert_eq!(app.view, View::Confirm);
+    }
+
+    #[test]
+    fn table_h_toggles_hide_system() {
+        let mut app = test_app(3);
+        assert!(!app.hide_system, "starts false");
+        handle_table_key(&mut app, KeyCode::Char('h'));
+        assert!(app.hide_system, "toggled to true");
+        handle_table_key(&mut app, KeyCode::Char('h'));
+        assert!(!app.hide_system, "toggled back to false");
     }
 }

@@ -152,6 +152,7 @@ mod tests {
             konami: super::super::KonamiDetector::new(),
             konami_mode: false,
             shuffle_remaining: 0,
+            hide_system: false,
         }
     }
 

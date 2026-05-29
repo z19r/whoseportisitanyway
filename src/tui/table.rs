@@ -267,6 +267,17 @@ fn render_status_bar(app: &App, frame: &mut Frame, area: Rect) {
         style::STATUS_FG
     };
 
+    let hide_sys_color = if app.hide_system {
+        Color::Rgb(255, 180, 50)
+    } else {
+        style::STATUS_FG
+    };
+    let hide_sys_label = if app.hide_system {
+        " hide sys "
+    } else {
+        " show sys "
+    };
+
     let spans = vec![
         key("j/k"),
         label(" nav  "),
@@ -286,6 +297,8 @@ fn render_status_bar(app: &App, frame: &mut Frame, area: Rect) {
             format!(" group:{} ", app.group_field.label()),
             Style::default().fg(group_color),
         ),
+        key("h"),
+        Span::styled(hide_sys_label.to_string(), Style::default().fg(hide_sys_color)),
         key("r"),
         label(" refresh  "),
         key("q"),
@@ -338,6 +351,7 @@ mod tests {
             konami: super::super::KonamiDetector::new(),
             konami_mode: false,
             shuffle_remaining: 0,
+            hide_system: false,
         }
     }
 

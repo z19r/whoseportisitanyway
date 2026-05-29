@@ -218,6 +218,7 @@ pub struct App {
     pub konami: KonamiDetector,
     pub konami_mode: bool,
     shuffle_remaining: u8,
+    pub hide_system: bool,
 }
 
 impl App {
@@ -236,6 +237,7 @@ impl App {
             konami: KonamiDetector::new(),
             konami_mode: false,
             shuffle_remaining: 0,
+            hide_system: false,
         }
     }
 
@@ -303,9 +305,11 @@ impl App {
     }
 
     fn apply_filter_sort(&mut self) {
+        let hide_sys = self.hide_system;
         let mut filtered: Vec<PortEntry> = self
             .all_entries
             .iter()
+            .filter(|e| !hide_sys || e.classification != Classification::System)
             .filter(|e| self.filter.matches(e))
             .cloned()
             .collect();
@@ -353,6 +357,12 @@ impl App {
 
     fn cycle_group(&mut self) {
         self.group_field = self.group_field.next();
+        self.selected = 0;
+        self.apply_filter_sort();
+    }
+
+    pub fn toggle_hide_system(&mut self) {
+        self.hide_system = !self.hide_system;
         self.selected = 0;
         self.apply_filter_sort();
     }
@@ -642,6 +652,109 @@ mod tests {
         assert_eq!(app.sort_field, SortField::Port);
         assert_eq!(app.filter, Filter::All);
         assert!(!app.konami_mode);
+        assert!(!app.hide_system);
+    }
+
+    #[test]
+    fn hide_system_default_false() {
+        let app = App::new(vec![]);
+        assert!(!app.hide_system);
+    }
+
+    #[test]
+    fn toggle_hide_system_filters_system_entries() {
+        use crate::model::{Ownership, Protocol};
+        let mut app = App::new(vec![]);
+        app.all_entries = vec![
+            PortEntry {
+                port: 22,
+                protocol: Protocol::Tcp,
+                pid: 1,
+                process_name: "sshd".into(),
+                command_line: "sshd".into(),
+                classification: Classification::System,
+                ownership: Ownership::Untracked,
+                state: PortState::Listen,
+                local_addr: "0.0.0.0:22".into(),
+                all_addrs: vec!["0.0.0.0:22".into()],
+                project: None,
+                uid: None,
+                user: None,
+                remote_addr: None,
+            },
+            PortEntry {
+                port: 3000,
+                protocol: Protocol::Tcp,
+                pid: 100,
+                process_name: "node".into(),
+                command_line: "node server.js".into(),
+                classification: Classification::DevServer,
+                ownership: Ownership::Untracked,
+                state: PortState::Listen,
+                local_addr: "0.0.0.0:3000".into(),
+                all_addrs: vec!["0.0.0.0:3000".into()],
+                project: None,
+                uid: None,
+                user: None,
+                remote_addr: None,
+            },
+        ];
+        app.apply_filter_sort();
+        assert_eq!(app.entries.len(), 2, "both entries visible before toggle");
+
+        app.toggle_hide_system();
+
+        assert!(app.hide_system);
+        assert_eq!(app.entries.len(), 1, "only non-system entry should remain");
+        assert_eq!(app.entries[0].port, 3000);
+    }
+
+    #[test]
+    fn toggle_hide_system_twice_restores() {
+        use crate::model::{Ownership, Protocol};
+        let mut app = App::new(vec![]);
+        app.all_entries = vec![
+            PortEntry {
+                port: 22,
+                protocol: Protocol::Tcp,
+                pid: 1,
+                process_name: "sshd".into(),
+                command_line: "sshd".into(),
+                classification: Classification::System,
+                ownership: Ownership::Untracked,
+                state: PortState::Listen,
+                local_addr: "0.0.0.0:22".into(),
+                all_addrs: vec!["0.0.0.0:22".into()],
+                project: None,
+                uid: None,
+                user: None,
+                remote_addr: None,
+            },
+            PortEntry {
+                port: 3000,
+                protocol: Protocol::Tcp,
+                pid: 100,
+                process_name: "node".into(),
+                command_line: "node server.js".into(),
+                classification: Classification::DevServer,
+                ownership: Ownership::Untracked,
+                state: PortState::Listen,
+                local_addr: "0.0.0.0:3000".into(),
+                all_addrs: vec!["0.0.0.0:3000".into()],
+                project: None,
+                uid: None,
+                user: None,
+                remote_addr: None,
+            },
+        ];
+        app.apply_filter_sort();
+
+        app.toggle_hide_system();
+        assert_eq!(app.entries.len(), 1);
+
+        app.toggle_hide_system();
+        assert!(!app.hide_system);
+        assert_eq!(app.entries.len(), 2, "both entries restored after second toggle");
     }
 
     #[test]
