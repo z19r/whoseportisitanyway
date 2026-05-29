@@ -260,45 +260,27 @@ impl App {
         }
     }
 
-    /// After a data refresh, restore modal focus or close the modal.
-    ///
-    /// If a Detail or Confirm modal is open, capture the identity of the currently
-    /// selected entry (port + protocol + pid) before the entries list changes, then
-    /// find its new position in the refreshed list.  If the entry is gone, close the
-    /// modal by transitioning back to Table view.
-    fn check_modal_validity(&mut self, port: u16, protocol: &crate::model::Protocol, pid: u32) {
-        match self
-            .entries
-            .iter()
-            .position(|e| e.port == port && &e.protocol == protocol && e.pid == pid)
-        {
-            Some(new_idx) => {
-                self.selected = new_idx;
-            }
-            None => {
-                self.view = View::Table;
-            }
-        }
-    }
-
     fn refresh(&mut self) -> Result<()> {
-        // Capture modal identity before the data changes.
-        let modal_identity = if self.view != View::Table {
-            self.entries
-                .get(self.selected)
-                .map(|e| (e.port, e.protocol, e.pid))
-        } else {
-            None
-        };
+        let prev_identity = self
+            .entries
+            .get(self.selected)
+            .map(|e| (e.port, e.protocol, e.pid));
 
         let scanner = scanner::create_scanner();
         let raw_ports = scanner.scan()?;
         self.all_entries = classifier::classify_all(raw_ports, &self.watched_ports);
         self.apply_filter_sort();
 
-        // Restore modal focus or close the modal if the entry disappeared.
-        if let Some((port, protocol, pid)) = modal_identity {
-            self.check_modal_validity(port, &protocol, pid);
+        if let Some((port, protocol, pid)) = prev_identity {
+            match self
+                .entries
+                .iter()
+                .position(|e| e.port == port && e.protocol == protocol && e.pid == pid)
+            {
+                Some(new_idx) => self.selected = new_idx,
+                None if self.view != View::Table => self.view = View::Table,
+                None => {}
+            }
         }
 
         Ok(())
@@ -834,26 +816,42 @@ mod tests {
         }
     }
 
+    fn simulate_refresh(app: &mut App, new_entries: Vec<PortEntry>) {
+        let prev_identity = app
+            .entries
+            .get(app.selected)
+            .map(|e| (e.port, e.protocol, e.pid));
+
+        app.all_entries = new_entries;
+        app.apply_filter_sort();
+
+        if let Some((port, protocol, pid)) = prev_identity {
+            match app
+                .entries
+                .iter()
+                .position(|e| e.port == port && e.protocol == protocol && e.pid == pid)
+            {
+                Some(new_idx) => app.selected = new_idx,
+                None if app.view != View::Table => app.view = View::Table,
+                None => {}
+            }
+        }
+    }
+
     #[test]
-    fn check_modal_validity_closes_detail_when_entry_gone() {
-        use crate::model::Protocol;
+    fn refresh_closes_detail_when_entry_gone() {
         let mut app = App::new(vec![]);
-        // Populate with one entry and open Detail view
         app.entries = vec![make_entry_custom(
             3000,
             100,
             Classification::DevServer,
             PortState::Listen,
         )];
+        app.all_entries = app.entries.clone();
         app.selected = 0;
         app.view = View::Detail;
 
-        // Simulate refresh: all_entries is now empty (port released)
-        app.all_entries = vec![];
-        app.apply_filter_sort();
-
-        // check_modal_validity should close the modal
-        app.check_modal_validity(3000, &Protocol::Tcp, 100);
+        simulate_refresh(&mut app, vec![]);
 
         assert_eq!(
             app.view,
@@ -863,8 +861,7 @@ mod tests {
     }
 
     #[test]
-    fn check_modal_validity_closes_confirm_when_entry_gone() {
-        use crate::model::Protocol;
+    fn refresh_closes_confirm_when_entry_gone() {
         let mut app = App::new(vec![]);
         app.entries = vec![make_entry_custom(
             8080,
@@ -872,13 +869,11 @@ mod tests {
             Classification::Database,
             PortState::Listen,
         )];
+        app.all_entries = app.entries.clone();
         app.selected = 0;
         app.view = View::Confirm;
 
-        app.all_entries = vec![];
-        app.apply_filter_sort();
-
-        app.check_modal_validity(8080, &Protocol::Tcp, 200);
+        simulate_refresh(&mut app, vec![]);
 
         assert_eq!(
             app.view,
@@ -888,60 +883,74 @@ mod tests {
     }
 
     #[test]
-    fn check_modal_validity_keeps_detail_when_entry_present() {
-        use crate::model::Protocol;
+    fn refresh_keeps_detail_when_entry_present() {
         let mut app = App::new(vec![]);
         let entry = make_entry_custom(3000, 100, Classification::DevServer, PortState::Listen);
-        app.all_entries = vec![entry];
+        app.all_entries = vec![entry.clone()];
         app.apply_filter_sort();
         app.selected = 0;
         app.view = View::Detail;
 
-        // Entry still present after refresh
-        app.check_modal_validity(3000, &Protocol::Tcp, 100);
+        simulate_refresh(&mut app, vec![entry]);
 
-        assert_eq!(
-            app.view,
-            View::Detail,
-            "modal should stay open when port still exists"
-        );
+        assert_eq!(app.view, View::Detail, "modal should stay open");
         assert_eq!(app.selected, 0);
     }
 
     #[test]
-    fn check_modal_validity_updates_index_when_entry_moves() {
-        use crate::model::Protocol;
+    fn refresh_updates_index_when_entry_moves() {
         let mut app = App::new(vec![]);
-        // Two entries; Detail is open on the second one (port 8080)
         app.entries = vec![
             make_entry_custom(3000, 100, Classification::DevServer, PortState::Listen),
             make_entry_custom(8080, 200, Classification::Database, PortState::Listen),
         ];
+        app.all_entries = app.entries.clone();
         app.selected = 1;
         app.view = View::Detail;
 
-        // After refresh, 3000 is gone — 8080 is now at index 0
-        app.all_entries = vec![make_entry_custom(
-            8080,
-            200,
-            Classification::Database,
-            PortState::Listen,
-        )];
-        app.apply_filter_sort();
-
-        // check_modal_validity should update selected to new position
-        app.check_modal_validity(8080, &Protocol::Tcp, 200);
+        simulate_refresh(
+            &mut app,
+            vec![make_entry_custom(
+                8080,
+                200,
+                Classification::Database,
+                PortState::Listen,
+            )],
+        );
 
         assert_eq!(app.view, View::Detail, "modal should stay open");
+        assert_eq!(app.selected, 0, "selected should follow entry to new index");
+    }
+
+    #[test]
+    fn refresh_table_view_keeps_selection_stable() {
+        let mut app = App::new(vec![]);
+        app.entries = vec![
+            make_entry_custom(3000, 100, Classification::DevServer, PortState::Listen),
+            make_entry_custom(8080, 200, Classification::Database, PortState::Listen),
+        ];
+        app.all_entries = app.entries.clone();
+        app.selected = 1;
+        app.view = View::Table;
+
+        simulate_refresh(
+            &mut app,
+            vec![
+                make_entry_custom(8080, 200, Classification::Database, PortState::Listen),
+                make_entry_custom(3000, 100, Classification::DevServer, PortState::Listen),
+            ],
+        );
+
+        assert_eq!(app.view, View::Table);
+        let sel = &app.entries[app.selected];
         assert_eq!(
-            app.selected, 0,
-            "selected index should point to new position of entry"
+            sel.port, 8080,
+            "highlight should track port 8080, not stay at index 1"
         );
     }
 
     #[test]
-    fn check_modal_validity_noop_in_table_view() {
-        use crate::model::Protocol;
+    fn refresh_table_view_entry_gone_stays_in_table() {
         let mut app = App::new(vec![]);
         app.entries = vec![make_entry_custom(
             3000,
@@ -949,15 +958,13 @@ mod tests {
             Classification::DevServer,
             PortState::Listen,
         )];
+        app.all_entries = app.entries.clone();
         app.selected = 0;
         app.view = View::Table;
 
-        // Even if entry is gone, Table view is unaffected
-        app.all_entries = vec![];
-        app.apply_filter_sort();
-        app.check_modal_validity(3000, &Protocol::Tcp, 100);
+        simulate_refresh(&mut app, vec![]);
 
-        assert_eq!(app.view, View::Table);
+        assert_eq!(app.view, View::Table, "table view should not change");
     }
 
     // ---- GroupField tests ----
