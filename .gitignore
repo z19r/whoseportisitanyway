@@ -1,11 +1,14 @@
 /target
 
-# Claude Code — only keep project-level settings and notify rule
-.claude/*
-!.claude/settings.local.json
-!.claude/rules/
-.claude/rules/*
-!.claude/rules/notify.md
+# Claude Code
+.claude/
+
+# Tool configs (aider, windsurf, whetstone, rtk)
+.aider*
+.windsurfrules
+.whetstone/
+.rtk/
+AGENTS.md
 
 # Netlify CLI local state (machine-specific)
 site/.netlify/
