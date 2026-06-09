@@ -24,7 +24,7 @@ function Hero() {
     <section className="hero ws-wrap" id="top">
       <div className="eyebrow-row">
         <span className="bar"></span>
-        <span>// WHOSEPORTISITANYWAY · v1.1.1 · RUST</span>
+        <span>// WHOSEPORTISITANYWAY · v1.1.2 · RUST</span>
       </div>
 
       <h1 className="display">
