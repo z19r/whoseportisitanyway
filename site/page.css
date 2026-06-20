@@ -401,6 +401,22 @@
   padding-top: var(--s-5);
   border-top: var(--b-thin) solid var(--rule);
 }
+.footer-copy {
+  text-transform: none;
+  letter-spacing: normal;
+}
+.heart {
+  display: inline-block;
+  animation: heartbeat 1.4s ease-in-out infinite;
+  transform-origin: center;
+}
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); }
+  14% { transform: scale(1.3); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.15); }
+  56% { transform: scale(1); }
+}
 
 /* ============================================================
    MARQUEE
