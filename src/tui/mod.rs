@@ -268,7 +268,10 @@ impl App {
 
         let scanner = scanner::create_scanner();
         let raw_ports = scanner.scan()?;
-        self.all_entries = classifier::classify_all(raw_ports, &self.watched_ports);
+        // Re-probe each refresh so the container map tracks starts/stops.
+        let docker = crate::docker::DockerIndex::probe();
+        self.all_entries =
+            classifier::classify_all(raw_ports, &self.watched_ports, docker.as_ref());
         self.apply_filter_sort();
 
         if let Some((port, protocol, pid)) = prev_identity {

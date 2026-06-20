@@ -6,27 +6,50 @@ mod project;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use crate::docker::{DockerEndpoint, DockerIndex};
 use crate::model::{Classification, Framework, Ownership, PortEntry, Project, RawPort};
 
 pub fn classify(raw: RawPort) -> PortEntry {
     let mut project_cache = HashMap::new();
     let mut framework_cache = HashMap::new();
-    classify_with_caches(raw, &mut project_cache, &mut framework_cache)
+    classify_with_caches(raw, &mut project_cache, &mut framework_cache, None)
 }
 
 fn classify_with_caches(
     raw: RawPort,
     project_cache: &mut HashMap<PathBuf, Option<Project>>,
     framework_cache: &mut HashMap<PathBuf, Option<Framework>>,
+    docker: Option<&DockerIndex>,
 ) -> PortEntry {
-    let classification = determine_classification(&raw);
-    let cwd = raw.cwd.clone().or_else(|| process_cwd(raw.pid));
-    let project = cwd.and_then(|dir| {
-        project_cache
-            .entry(dir.clone())
-            .or_insert_with(|| project::detect_project(&dir))
-            .clone()
-    });
+    // A published Docker host port is authoritative: the daemon socket tells us
+    // the type and compose project without root, which `/proc` can't under an
+    // unprivileged scan. Fall back to process/cwd heuristics for everything else.
+    //
+    // Matching is keyed on the local port across all socket states, and that is
+    // correct: only docker-proxy's own listen/accept sockets carry the published
+    // port as their *local* port. An unrelated outbound connection to a published
+    // port has an ephemeral local port, so it never collides here, and two
+    // processes can't bind the same listening port. No state guard is needed.
+    let docker_endpoint = docker.and_then(|index| index.get(raw.port));
+
+    let classification = if docker_endpoint.is_some() {
+        Classification::Docker
+    } else {
+        determine_classification(&raw)
+    };
+
+    let project = match docker_endpoint {
+        Some(endpoint) => docker_project(endpoint),
+        None => {
+            let cwd = raw.cwd.clone().or_else(|| process_cwd(raw.pid));
+            cwd.and_then(|dir| {
+                project_cache
+                    .entry(dir.clone())
+                    .or_insert_with(|| project::detect_project(&dir))
+                    .clone()
+            })
+        }
+    };
 
     let framework_hint = framework::detect_framework(
         &raw.process_name,
@@ -63,16 +86,33 @@ fn classify_with_caches(
     }
 }
 
-pub fn classify_all(raw_ports: Vec<RawPort>, watched_ports: &[u16]) -> Vec<PortEntry> {
+pub fn classify_all(
+    raw_ports: Vec<RawPort>,
+    watched_ports: &[u16],
+    docker: Option<&DockerIndex>,
+) -> Vec<PortEntry> {
     let mut project_cache: HashMap<PathBuf, Option<Project>> = HashMap::new();
     let mut framework_cache: HashMap<PathBuf, Option<Framework>> = HashMap::new();
     let classified: Vec<PortEntry> = raw_ports
         .into_iter()
-        .map(|raw| classify_with_caches(raw, &mut project_cache, &mut framework_cache))
+        .map(|raw| classify_with_caches(raw, &mut project_cache, &mut framework_cache, docker))
         .collect();
     let mut collapsed = collapse::collapse(classified);
     assess::assess(&mut collapsed, watched_ports);
     collapsed
+}
+
+/// Build a `Project` from a Docker endpoint: compose project (or container
+/// name) as the label, and the compose working directory as the root so the
+/// existing framework detection can inspect real project files when present.
+fn docker_project(endpoint: &DockerEndpoint) -> Option<Project> {
+    let name = endpoint.project_label()?;
+    let root = endpoint.working_dir.clone().unwrap_or_default();
+    Some(Project {
+        name,
+        root,
+        framework: None,
+    })
 }
 
 fn determine_classification(raw: &RawPort) -> Classification {
@@ -907,7 +947,7 @@ mod tests {
 
     #[test]
     fn classify_all_with_empty_input() {
-        let result = classify_all(vec![], &[]);
+        let result = classify_all(vec![], &[], None);
         assert!(result.is_empty());
     }
 
@@ -923,7 +963,7 @@ mod tests {
             pid: 200,
             ..raw("postgres", "postgres -D /data")
         };
-        let result = classify_all(vec![node, pg], &[3000, 5432]);
+        let result = classify_all(vec![node, pg], &[3000, 5432], None);
         let node_entry = result.iter().find(|e| e.process_name == "node").unwrap();
         assert_eq!(node_entry.ownership, Ownership::Owned);
         let pg_entry = result
@@ -931,5 +971,86 @@ mod tests {
             .find(|e| e.process_name == "postgres")
             .unwrap();
         assert_eq!(pg_entry.ownership, Ownership::Blocked);
+    }
+
+    // --- Docker socket enrichment (works without root) ---
+
+    const DOCKER_BODY: &str = r#"[
+        {
+            "Names": ["/automem-flask-api-1"],
+            "Image": "automem-flask-api",
+            "Labels": {
+                "com.docker.compose.project": "automem",
+                "com.docker.compose.service": "flask-api"
+            },
+            "Ports": [{"PublicPort": 8001, "Type": "tcp"}]
+        },
+        {
+            "Names": ["/redis"],
+            "Image": "redis:7",
+            "Labels": {},
+            "Ports": [{"PublicPort": 6379, "Type": "tcp"}]
+        }
+    ]"#;
+
+    fn docker_index() -> DockerIndex {
+        DockerIndex::from_containers_json_for_tests(DOCKER_BODY)
+    }
+
+    #[test]
+    fn docker_port_classifies_as_docker_without_process_name() {
+        // A root-owned docker-proxy listener surfaces with no process under an
+        // unprivileged scan; the socket still identifies it.
+        let raw = RawPort {
+            port: 8001,
+            pid: 0,
+            ..raw("", "")
+        };
+        let index = docker_index();
+        let result = classify_all(vec![raw], &[], Some(&index));
+        let entry = result.iter().find(|e| e.port == 8001).unwrap();
+        assert_eq!(entry.classification, Classification::Docker);
+    }
+
+    #[test]
+    fn docker_port_adopts_compose_project_name() {
+        let raw = RawPort {
+            port: 8001,
+            pid: 0,
+            ..raw("", "")
+        };
+        let index = docker_index();
+        let result = classify_all(vec![raw], &[], Some(&index));
+        let entry = result.iter().find(|e| e.port == 8001).unwrap();
+        let project = entry.project.as_ref().expect("project should be set");
+        assert_eq!(project.name, "automem");
+    }
+
+    #[test]
+    fn standalone_docker_port_uses_container_name_as_project() {
+        let raw = RawPort {
+            port: 6379,
+            pid: 0,
+            ..raw("", "")
+        };
+        let index = docker_index();
+        let result = classify_all(vec![raw], &[], Some(&index));
+        let entry = result.iter().find(|e| e.port == 6379).unwrap();
+        assert_eq!(entry.classification, Classification::Docker);
+        assert_eq!(entry.project.as_ref().unwrap().name, "redis");
+    }
+
+    #[test]
+    fn non_docker_port_is_unaffected_by_index() {
+        // Port 3000 isn't published by any container in the index, so normal
+        // process-based classification applies.
+        let raw = RawPort {
+            port: 3000,
+            ..raw("node", "node server.js")
+        };
+        let index = docker_index();
+        let result = classify_all(vec![raw], &[], Some(&index));
+        let entry = result.iter().find(|e| e.port == 3000).unwrap();
+        assert_eq!(entry.classification, Classification::DevServer);
     }
 }
