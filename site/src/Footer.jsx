@@ -24,7 +24,7 @@ function Footer() {
       </div>
 
       <div className="footer-meta">
-        <span>MADE IN CHICAGO, WITH 🫀 &copy; {new Date().getFullYear()} z19r. All rights reserved</span>
+        <span className="footer-copy">Made in Chicago, with <span className="heart">🫀</span> &copy;2026 z19r. All rights reserved.</span>
       </div>
     </footer>
   );
