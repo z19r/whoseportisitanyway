@@ -12,3 +12,4 @@ AGENTS.md
 
 # Netlify CLI local state (machine-specific)
 site/.netlify/
+.tokensave/
