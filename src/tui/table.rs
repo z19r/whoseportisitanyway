@@ -187,13 +187,6 @@ fn render_table(app: &App, frame: &mut Frame, area: Rect) {
         Style::default().fg(if wild { style::wild_dim(0) } else { style::DIM }),
     ));
 
-    if app.all_entries.iter().any(|e| e.pid == 0) {
-        title_line.push(Span::styled(
-            "run with sudo for full info ",
-            Style::default().fg(Color::Rgb(255, 100, 100)).italic(),
-        ));
-    }
-
     let border_color = if wild {
         style::wild_border()
     } else {
@@ -381,7 +374,7 @@ mod tests {
     }
 
     #[test]
-    fn render_with_pid_zero_shows_sudo_hint() {
+    fn render_with_pid_zero_no_panic() {
         let mut app = test_app(1);
         app.all_entries[0].pid = 0;
         app.entries[0].pid = 0;
