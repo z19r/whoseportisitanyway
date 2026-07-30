@@ -38,7 +38,11 @@ function FAQ() {
           <div
             key={i}
             className={'faq-item' + (open === i ? ' is-open' : '')}
-            onClick={() => setOpen(open === i ? null : i)}
+            onClick={() => {
+              const next = open === i ? null : i;
+              if (next !== null) window.wpTrack('faq-open', { question: f.q });
+              setOpen(next);
+            }}
           >
             <div className="faq-q">
               <span>{f.q}</span>

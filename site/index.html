@@ -20,6 +20,27 @@
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
   })();
 </script>
+
+<!-- Umami analytics: cookieless, privacy-first. Auto-tracks pageviews + Core Web Vitals. -->
+<script
+  defer
+  src="https://cloud.umami.is/script.js"
+  data-website-id="03676aa0-9c93-4eb8-8491-330cda2f8c73"
+  data-tag="v1.2.0"
+  data-performance="true"
+  data-do-not-track="true"
+></script>
+<script>
+  // Load-order-safe custom-event helper. Components call wpTrack(name, data)
+  // without caring whether the deferred Umami script has loaded yet.
+  window.wpTrack = function (name, data) {
+    try {
+      if (window.umami && typeof window.umami.track === 'function') {
+        return data ? window.umami.track(name, data) : window.umami.track(name);
+      }
+    } catch (_) {}
+  };
+</script>
 </head>
 <body>
 <div id="root"></div>
