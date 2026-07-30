@@ -16,6 +16,7 @@ function App() {
       var next = prev === 'dark' ? 'light' : 'dark';
       document.documentElement.setAttribute('data-theme', next);
       try { localStorage.setItem('wp-theme', next); } catch (_) {}
+      window.wpTrack('theme-toggle', { theme: next });
       return next;
     });
   }, []);

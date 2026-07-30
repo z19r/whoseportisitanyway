@@ -1,11 +1,12 @@
 /* global React */
 
-function CopyChip({ cmd }) {
+function CopyChip({ cmd, location }) {
   const [copied, setCopied] = React.useState(false);
   const onCopy = () => {
     navigator.clipboard?.writeText(cmd).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1400);
+      window.wpTrack('copy-install', { cmd, location: location || 'unknown' });
     });
   };
   return (
@@ -39,9 +40,9 @@ function Hero() {
       </p>
 
       <div className="hero-cta">
-        <CopyChip cmd="cargo install whoseportisitanyway" />
-        <a className="ws-btn ws-btn--primary" href="#install">INSTALL</a>
-        <a className="ws-btn ws-btn--ghost" href="https://github.com/z19r/whoseportisitanyway" target="_blank" rel="noreferrer">VIEW ON GITHUB</a>
+        <CopyChip cmd="cargo install whoseportisitanyway" location="hero" />
+        <a className="ws-btn ws-btn--primary" href="#install" data-umami-event="cta-install" data-umami-event-location="hero">INSTALL</a>
+        <a className="ws-btn ws-btn--ghost" href="https://github.com/z19r/whoseportisitanyway" target="_blank" rel="noreferrer" data-umami-event="github-click" data-umami-event-location="hero">VIEW ON GITHUB</a>
       </div>
 
       <div className="hero-badges">

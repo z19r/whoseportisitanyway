@@ -18,7 +18,7 @@ function Nav({ theme, onToggleTheme }) {
 
       <div className="wp-nav-links">
         {sections.map((s) => (
-          <a key={s.id} href={'#' + s.id}>{s.label}</a>
+          <a key={s.id} href={'#' + s.id} data-umami-event="nav-link" data-umami-event-section={s.id}>{s.label}</a>
         ))}
       </div>
 
@@ -28,7 +28,7 @@ function Nav({ theme, onToggleTheme }) {
           <span className="dot"></span>
           {isLight ? 'LIGHT' : 'NIGHT'}
         </button>
-        <a className="ws-btn ws-btn--sm ws-btn--ghost" href="https://github.com/z19r/whoseportisitanyway" target="_blank" rel="noreferrer">GITHUB</a>
+        <a className="ws-btn ws-btn--sm ws-btn--ghost" href="https://github.com/z19r/whoseportisitanyway" target="_blank" rel="noreferrer" data-umami-event="github-click" data-umami-event-location="nav">GITHUB</a>
       </div>
     </nav>
   );
