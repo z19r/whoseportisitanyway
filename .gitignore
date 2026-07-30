@@ -13,3 +13,6 @@ AGENTS.md
 # Netlify CLI local state (machine-specific)
 site/.netlify/
 .tokensave/
+
+# Serena local project config (machine-specific)
+.serena/project.yml
