@@ -88,12 +88,12 @@ fn render_table(app: &App, frame: &mut Frame, area: Rect) {
         let name_color = if wild {
             style::wild_dim(i + 50)
         } else {
-            Color::White
+            Color::Reset
         };
         let proj_color = if wild {
             style::wild_dim(i + 100)
         } else {
-            Color::Rgb(180, 160, 220)
+            style::SECONDARY_FG
         };
 
         // When pid=0 (blocked process), show user info as fallback
@@ -106,6 +106,33 @@ fn render_table(app: &App, frame: &mut Frame, area: Rect) {
         } else {
             e.process_name.clone()
         };
+
+        // On the selected row the accent colors (and Color::Reset text, which
+        // is dark on a light terminal) sit on the dark SELECTED_BG bar. Force
+        // the whole row to light text so it stays readable on the highlight.
+        let (dim, name_color, type_color, proj_color, port_color, state_color, own_style) =
+            if !wild && i == app.selected {
+                let light = style::SELECTED_FG;
+                (
+                    light,
+                    light,
+                    light,
+                    light,
+                    light,
+                    light,
+                    Style::default().fg(light).bold(),
+                )
+            } else {
+                (
+                    dim,
+                    name_color,
+                    type_color,
+                    proj_color,
+                    port_color,
+                    state_color,
+                    own_style,
+                )
+            };
 
         let row = Row::new(vec![
             Cell::from(format!(" {:>7}", e.pid)).style(Style::default().fg(dim)),
@@ -131,10 +158,7 @@ fn render_table(app: &App, frame: &mut Frame, area: Rect) {
             .bg(style::wild_header_bg())
             .bold()
     } else {
-        Style::default()
-            .fg(style::HEADER_FG)
-            .bg(style::HEADER_BG)
-            .bold()
+        Style::default().fg(style::HEADER_FG).bold()
     };
 
     let sort_col: usize = match app.sort_field {
@@ -192,11 +216,7 @@ fn render_table(app: &App, frame: &mut Frame, area: Rect) {
     } else {
         style::BORDER_COLOR
     };
-    let bg = if wild {
-        style::wild_bg()
-    } else {
-        Color::Rgb(10, 5, 25)
-    };
+    let bg = if wild { style::wild_bg() } else { Color::Reset };
     let highlight = if wild {
         Style::default()
             .bg(style::wild_selected_bg())
@@ -298,7 +318,7 @@ fn render_status_bar(app: &App, frame: &mut Frame, area: Rect) {
         label(" quit"),
     ];
 
-    let bar = Paragraph::new(Line::from(spans)).style(Style::default().bg(style::STATUS_BG));
+    let bar = Paragraph::new(Line::from(spans)).style(Style::default().bg(Color::Reset));
 
     frame.render_widget(bar, area);
 }
@@ -354,6 +374,52 @@ mod tests {
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
         terminal.draw(|frame| render(&app, frame)).unwrap();
+    }
+
+    #[test]
+    fn selected_row_uses_light_text_on_highlight() {
+        let mut app = test_app(4);
+        app.selected = 2;
+        let backend = TestBackend::new(100, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(&app, frame)).unwrap();
+
+        let buf = terminal.backend().buffer();
+        // Layout: top border at row 0, header at row 1, data rows from row 2.
+        let y = 2 + app.selected as u16;
+
+        let mut saw_highlight_bar = false;
+        let mut saw_text = false;
+        for x in 0..buf.area.width {
+            let cell = &buf[(x, y)];
+            if cell.bg == style::SELECTED_BG {
+                saw_highlight_bar = true;
+            }
+            // Every glyph on the selected row must use the light highlight
+            // foreground, never a dark accent or Color::Reset (which is dark on
+            // a light terminal).
+            if cell
+                .symbol()
+                .chars()
+                .next()
+                .is_some_and(|c| c.is_ascii_digit())
+            {
+                saw_text = true;
+                assert_eq!(
+                    cell.fg,
+                    style::SELECTED_FG,
+                    "selected-row glyph at x={x} should be light",
+                );
+            }
+        }
+        assert!(
+            saw_highlight_bar,
+            "selected row should paint the highlight bar"
+        );
+        assert!(
+            saw_text,
+            "selected row should contain digit glyphs to check"
+        );
     }
 
     #[test]

@@ -70,7 +70,7 @@ pub fn render(app: &App, frame: &mut Frame) {
                         Style::default().fg(if wild {
                             style::wild_dim(1)
                         } else {
-                            Color::White
+                            Color::Reset
                         }),
                     ),
                 ]),
@@ -82,7 +82,7 @@ pub fn render(app: &App, frame: &mut Frame) {
                             .fg(if wild {
                                 style::wild_dim(2)
                             } else {
-                                Color::White
+                                Color::Reset
                             })
                             .bold(),
                     ),
@@ -94,7 +94,7 @@ pub fn render(app: &App, frame: &mut Frame) {
                         Style::default().fg(if wild {
                             style::wild_dim(3)
                         } else {
-                            Color::Rgb(180, 160, 220)
+                            style::SECONDARY_FG
                         }),
                     ),
                 ]),
@@ -207,7 +207,7 @@ pub fn render(app: &App, frame: &mut Frame) {
                         Style::default().fg(if wild {
                             style::wild_dim(7)
                         } else {
-                            Color::Rgb(180, 160, 220)
+                            style::SECONDARY_FG
                         }),
                     ),
                 ]));
@@ -258,11 +258,7 @@ pub fn render(app: &App, frame: &mut Frame) {
     } else {
         style::BORDER_HIGHLIGHT
     };
-    let bg = if wild {
-        style::wild_bg()
-    } else {
-        Color::Rgb(10, 5, 25)
-    };
+    let bg = if wild { style::wild_bg() } else { Color::Reset };
     let paragraph = Paragraph::new(lines).block(
         Block::default()
             .title(Span::styled(

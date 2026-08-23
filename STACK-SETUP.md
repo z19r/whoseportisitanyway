@@ -8,6 +8,7 @@ token-efficient Claude Code sessions.
 ```bash
 whetstone              # Start Claude with Headroom proxy
 whetstone claude       # Same as above
+whetstone doctor       # Inspect ~/.claude/settings.json
 ```
 
 ## Tools
@@ -22,8 +23,8 @@ whetstone claude       # Same as above
 
 | File | Purpose |
 |------|---------|
-| `~/.claude/settings.json` | Hook registrations (global) |
-| `.claude/config.local.json` | Project config |
+| `~/.claude/settings.json` | Hook registrations (written by rtk init / icm init) |
+| `.claude/whetstone.json` | Project manifest (whetstone, integration, tool versions) |
 
 ## Uninstall
 

@@ -10,14 +10,14 @@ pub fn render(app: &App, frame: &mut Frame) {
             let mut lines = vec![
                 Line::from(""),
                 Line::from(vec![
-                    Span::styled("  Kill ", Style::default().fg(Color::White)),
+                    Span::styled("  Kill ", Style::default().fg(Color::Reset)),
                     Span::styled(
                         entry.process_name.clone(),
-                        Style::default().fg(Color::Rgb(255, 100, 100)).bold(),
+                        Style::default().fg(Color::Rgb(215, 70, 70)).bold(),
                     ),
                     Span::styled(
                         format!(" (PID {})?", entry.pid),
-                        Style::default().fg(Color::White),
+                        Style::default().fg(Color::Reset),
                     ),
                 ]),
                 Line::from(""),
@@ -38,13 +38,13 @@ pub fn render(app: &App, frame: &mut Frame) {
                 lines.push(Line::from(vec![
                     Span::styled(
                         "  This will stop ",
-                        Style::default().fg(Color::Rgb(255, 180, 50)),
+                        Style::default().fg(Color::Rgb(200, 130, 30)),
                     ),
                     Span::styled(
                         project.name.clone(),
-                        Style::default().fg(Color::Rgb(255, 180, 50)).bold(),
+                        Style::default().fg(Color::Rgb(200, 130, 30)).bold(),
                     ),
-                    Span::styled(".", Style::default().fg(Color::Rgb(255, 180, 50))),
+                    Span::styled(".", Style::default().fg(Color::Rgb(200, 130, 30))),
                 ]));
             }
 
@@ -63,7 +63,7 @@ pub fn render(app: &App, frame: &mut Frame) {
                     " n ",
                     Style::default()
                         .fg(Color::White)
-                        .bg(Color::Rgb(60, 60, 80))
+                        .bg(Color::Rgb(90, 90, 110))
                         .bold(),
                 ),
                 Span::styled(" Cancel", Style::default().fg(style::DIM)),
@@ -85,11 +85,11 @@ pub fn render(app: &App, frame: &mut Frame) {
         Block::default()
             .title(Span::styled(
                 " Confirm Kill ",
-                Style::default().fg(Color::Rgb(255, 70, 70)).bold(),
+                Style::default().fg(Color::Rgb(215, 70, 70)).bold(),
             ))
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::Rgb(200, 40, 40)))
-            .style(Style::default().bg(Color::Rgb(30, 5, 10))),
+            .style(Style::default().bg(Color::Reset)),
     );
 
     frame.render_widget(paragraph, area);

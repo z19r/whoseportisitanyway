@@ -56,7 +56,6 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
-    use super::defaults::*;
     use super::*;
 
     #[test]
