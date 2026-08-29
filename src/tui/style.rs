@@ -4,20 +4,31 @@ use ratatui::prelude::*;
 
 use crate::model::{Classification, Ownership, PortState};
 
-pub const HEADER_BG: Color = Color::Rgb(30, 15, 60);
-pub const HEADER_FG: Color = Color::Rgb(200, 160, 255);
+// All accent colors below sit in a luminance band that clears >=3:1 contrast
+// against BOTH a pure-white and a pure-black terminal background, so the UI
+// stays readable whatever theme the terminal uses. Neutral text and base
+// surfaces use Color::Reset (see the render code) to inherit the terminal's
+// own foreground/background. See `theme_accents_readable_on_light_and_dark`.
+pub const HEADER_FG: Color = Color::Rgb(150, 100, 225);
 
-pub const BORDER_COLOR: Color = Color::Rgb(100, 60, 180);
-pub const BORDER_HIGHLIGHT: Color = Color::Rgb(180, 120, 255);
+pub const BORDER_COLOR: Color = Color::Rgb(120, 80, 190);
+pub const BORDER_HIGHLIGHT: Color = Color::Rgb(150, 100, 225);
 
-pub const STATUS_BG: Color = Color::Rgb(20, 10, 45);
-pub const STATUS_FG: Color = Color::Rgb(140, 120, 180);
-pub const STATUS_KEY: Color = Color::Rgb(255, 100, 200);
+pub const STATUS_FG: Color = Color::Rgb(150, 130, 190);
+pub const STATUS_KEY: Color = Color::Rgb(210, 80, 175);
 
-pub const SELECTED_BG: Color = Color::Rgb(60, 30, 120);
-pub const SELECTED_FG: Color = Color::White;
+// Selected row keeps an explicit highlight bar. The foreground is an explicit
+// bright truecolor (NOT Color::White, which maps to ANSI palette color 15 and
+// renders as a muted off-white under many themes) so the row reads as clearly
+// light on the bar regardless of the terminal palette (~7.9:1 contrast).
+pub const SELECTED_BG: Color = Color::Rgb(95, 62, 160);
+pub const SELECTED_FG: Color = Color::Rgb(245, 245, 250);
 
-pub const DIM: Color = Color::Rgb(100, 90, 120);
+pub const DIM: Color = Color::Rgb(125, 118, 140);
+
+// Secondary text (project names, wrapped command lines): a muted purple that
+// still reads on light and dark backgrounds.
+pub const SECONDARY_FG: Color = Color::Rgb(150, 130, 190);
 
 pub const TITLE_GRADIENT: [Color; 7] = [
     Color::Rgb(255, 50, 100),
@@ -65,17 +76,17 @@ fn wild_color(offset: usize) -> Color {
 
 pub fn classification_color(class: &Classification) -> Color {
     match class {
-        Classification::DevServer => Color::Rgb(80, 255, 120),
-        Classification::Database => Color::Rgb(255, 140, 50),
-        Classification::Docker => Color::Rgb(50, 180, 255),
-        Classification::BuildTool => Color::Rgb(200, 200, 100),
-        Classification::LanguageServer => Color::Rgb(160, 120, 255),
-        Classification::Proxy => Color::Rgb(50, 220, 220),
-        Classification::Browser => Color::Rgb(200, 180, 220),
-        Classification::MessageQueue => Color::Rgb(255, 100, 200),
-        Classification::SshTunnel => Color::Rgb(255, 180, 50),
-        Classification::System => Color::Rgb(160, 140, 180),
-        Classification::Unknown => Color::Rgb(120, 100, 140),
+        Classification::DevServer => Color::Rgb(40, 160, 70),
+        Classification::Database => Color::Rgb(200, 110, 40),
+        Classification::Docker => Color::Rgb(60, 130, 220),
+        Classification::BuildTool => Color::Rgb(165, 135, 20),
+        Classification::LanguageServer => Color::Rgb(150, 100, 225),
+        Classification::Proxy => Color::Rgb(20, 160, 150),
+        Classification::Browser => Color::Rgb(150, 130, 180),
+        Classification::MessageQueue => Color::Rgb(210, 80, 175),
+        Classification::SshTunnel => Color::Rgb(200, 130, 30),
+        Classification::System => Color::Rgb(140, 128, 155),
+        Classification::Unknown => Color::Rgb(120, 105, 140),
     }
 }
 
@@ -98,8 +109,8 @@ pub fn classification_color_wild(class: &Classification, row: usize) -> Color {
 
 pub fn ownership_style(ownership: &Ownership) -> Style {
     match ownership {
-        Ownership::Owned => Style::default().fg(Color::Rgb(80, 255, 120)).bold(),
-        Ownership::Blocked => Style::default().fg(Color::Rgb(255, 70, 70)).bold(),
+        Ownership::Owned => Style::default().fg(Color::Rgb(40, 160, 70)).bold(),
+        Ownership::Blocked => Style::default().fg(Color::Rgb(215, 70, 70)).bold(),
         Ownership::Untracked => Style::default().fg(DIM),
     }
 }
@@ -114,8 +125,8 @@ pub fn ownership_style_wild(ownership: &Ownership, row: usize) -> Style {
 
 pub fn state_color(state: &PortState) -> Color {
     match state {
-        PortState::Listen => Color::Rgb(255, 220, 50),
-        PortState::Established => Color::Rgb(100, 80, 140),
+        PortState::Listen => Color::Rgb(175, 135, 20),
+        PortState::Established => Color::Rgb(125, 115, 150),
     }
 }
 
@@ -159,10 +170,10 @@ pub fn wild_title() -> Vec<Span<'static>> {
 
 pub fn port_color(port: u16) -> Color {
     match port {
-        0..=1023 => Color::Rgb(255, 100, 100),
-        1024..=8999 => Color::Rgb(180, 140, 255),
-        9000..=49151 => Color::Rgb(100, 200, 255),
-        _ => Color::Rgb(160, 160, 180),
+        0..=1023 => Color::Rgb(215, 70, 70),
+        1024..=8999 => Color::Rgb(150, 100, 225),
+        9000..=49151 => Color::Rgb(60, 130, 220),
+        _ => Color::Rgb(140, 140, 155),
     }
 }
 
@@ -360,11 +371,12 @@ mod tests {
     }
 
     #[test]
-    fn state_color_listen_is_yellow() {
-        let Color::Rgb(r, g, _) = state_color(&PortState::Listen) else {
+    fn state_color_listen_is_warm() {
+        // Warm amber, ordered r > g > b (yellow would wash out on a light term).
+        let Color::Rgb(r, g, b) = state_color(&PortState::Listen) else {
             panic!()
         };
-        assert!(r > 200 && g > 200);
+        assert!(r > g && g > b);
     }
 
     #[test]
@@ -382,56 +394,55 @@ mod tests {
     }
 
     #[test]
-    fn port_color_privileged() {
-        let Color::Rgb(r, _, _) = port_color(80) else {
+    fn port_color_privileged_is_red() {
+        let Color::Rgb(r, g, b) = port_color(80) else {
             panic!()
         };
-        assert_eq!(r, 255);
+        assert!(r > g && r > b);
     }
 
     #[test]
-    fn port_color_common() {
-        let Color::Rgb(_, g, _) = port_color(3000) else {
+    fn port_color_common_is_purple() {
+        let Color::Rgb(r, g, b) = port_color(3000) else {
             panic!()
         };
-        assert_eq!(g, 140);
+        assert!(b > r && b > g);
     }
 
     #[test]
-    fn port_color_high() {
-        let Color::Rgb(_, g, _) = port_color(9000) else {
+    fn port_color_high_is_blue() {
+        let Color::Rgb(r, g, b) = port_color(9000) else {
             panic!()
         };
-        assert_eq!(g, 200);
+        assert!(b > r && b > g);
     }
 
     #[test]
-    fn port_color_ephemeral() {
+    fn port_color_ephemeral_is_gray() {
         let Color::Rgb(r, g, _) = port_color(50000) else {
             panic!()
         };
-        assert_eq!(r, 160);
-        assert_eq!(g, 160);
+        assert_eq!(r, g);
     }
 
     #[test]
     fn port_color_boundary_1023() {
-        assert_eq!(port_color(1023), Color::Rgb(255, 100, 100));
+        assert_eq!(port_color(1023), Color::Rgb(215, 70, 70));
     }
 
     #[test]
     fn port_color_boundary_1024() {
-        assert_eq!(port_color(1024), Color::Rgb(180, 140, 255));
+        assert_eq!(port_color(1024), Color::Rgb(150, 100, 225));
     }
 
     #[test]
     fn port_color_boundary_49151() {
-        assert_eq!(port_color(49151), Color::Rgb(100, 200, 255));
+        assert_eq!(port_color(49151), Color::Rgb(60, 130, 220));
     }
 
     #[test]
     fn port_color_boundary_49152() {
-        assert_eq!(port_color(49152), Color::Rgb(160, 160, 180));
+        assert_eq!(port_color(49152), Color::Rgb(140, 140, 155));
     }
 
     #[test]
@@ -497,11 +508,94 @@ mod tests {
 
     #[test]
     fn constants_are_correct() {
-        assert_eq!(HEADER_BG, Color::Rgb(30, 15, 60));
-        assert_eq!(HEADER_FG, Color::Rgb(200, 160, 255));
-        assert_eq!(BORDER_COLOR, Color::Rgb(100, 60, 180));
-        assert_eq!(SELECTED_BG, Color::Rgb(60, 30, 120));
-        assert_eq!(SELECTED_FG, Color::White);
-        assert_eq!(DIM, Color::Rgb(100, 90, 120));
+        assert_eq!(HEADER_FG, Color::Rgb(150, 100, 225));
+        assert_eq!(BORDER_COLOR, Color::Rgb(120, 80, 190));
+        assert_eq!(SELECTED_BG, Color::Rgb(95, 62, 160));
+        assert_eq!(SELECTED_FG, Color::Rgb(245, 245, 250));
+        assert_eq!(DIM, Color::Rgb(125, 118, 140));
+    }
+
+    // --- Theme readability guard -------------------------------------------
+    // The app paints no base background of its own (Color::Reset), so every
+    // accent color must read against whatever the terminal uses. WCAG relative
+    // luminance in [0.10, 0.30] guarantees >=3:1 contrast against BOTH pure
+    // black and pure white. This test fails if a future color drifts out of
+    // that band and would become invisible on a light or dark terminal.
+
+    fn channel(c: u8) -> f64 {
+        let c = c as f64 / 255.0;
+        if c <= 0.03928 {
+            c / 12.92
+        } else {
+            ((c + 0.055) / 1.055).powf(2.4)
+        }
+    }
+
+    fn luminance(color: Color) -> f64 {
+        let Color::Rgb(r, g, b) = color else {
+            panic!("expected an Rgb color, got {color:?}")
+        };
+        0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+    }
+
+    fn assert_readable_on_both_themes(name: &str, color: Color) {
+        let l = luminance(color);
+        assert!(
+            (0.10..=0.30).contains(&l),
+            "{name} luminance {l:.3} is outside the theme-safe band [0.10, 0.30]; \
+             it would be low-contrast on a light or dark terminal",
+        );
+    }
+
+    #[test]
+    fn theme_accents_readable_on_light_and_dark() {
+        assert_readable_on_both_themes("HEADER_FG", HEADER_FG);
+        assert_readable_on_both_themes("BORDER_COLOR", BORDER_COLOR);
+        assert_readable_on_both_themes("BORDER_HIGHLIGHT", BORDER_HIGHLIGHT);
+        assert_readable_on_both_themes("STATUS_FG", STATUS_FG);
+        assert_readable_on_both_themes("STATUS_KEY", STATUS_KEY);
+        assert_readable_on_both_themes("DIM", DIM);
+        assert_readable_on_both_themes("SECONDARY_FG", SECONDARY_FG);
+
+        for class in [
+            Classification::DevServer,
+            Classification::Database,
+            Classification::Docker,
+            Classification::BuildTool,
+            Classification::LanguageServer,
+            Classification::Proxy,
+            Classification::Browser,
+            Classification::MessageQueue,
+            Classification::SshTunnel,
+            Classification::System,
+            Classification::Unknown,
+        ] {
+            assert_readable_on_both_themes("classification", classification_color(&class));
+        }
+
+        assert_readable_on_both_themes("listen", state_color(&PortState::Listen));
+        assert_readable_on_both_themes("established", state_color(&PortState::Established));
+
+        for port in [80u16, 3000, 9000, 50000] {
+            assert_readable_on_both_themes("port", port_color(port));
+        }
+
+        if let Some(fg) = ownership_style(&Ownership::Owned).fg {
+            assert_readable_on_both_themes("owned", fg);
+        }
+        if let Some(fg) = ownership_style(&Ownership::Blocked).fg {
+            assert_readable_on_both_themes("blocked", fg);
+        }
+    }
+
+    #[test]
+    fn selected_bar_carries_white_text() {
+        // The selection bar is intentionally darker than the accent band; what
+        // matters is that its white text stays high-contrast on top of it.
+        let ratio = {
+            let bar = luminance(SELECTED_BG);
+            (1.0 + 0.05) / (bar + 0.05)
+        };
+        assert!(ratio >= 4.5, "white on SELECTED_BG is only {ratio:.1}:1");
     }
 }
