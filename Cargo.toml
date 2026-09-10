@@ -14,7 +14,7 @@ categories = ["command-line-utilities", "network-programming"]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 crossterm = "0.29"
-dirs = "6"
+dirs = "7"
 nix = { version = "0.31", features = ["signal"] }
 ratatui = "0.30"
 serde = { version = "1", features = ["derive"] }
