@@ -13,11 +13,12 @@ When the PR is merged into `main`, GitHub Actions:
 
 1. Re-verifies format, clippy, tests
 2. Builds release binaries (4 targets)
-3. Creates git tag
-4. Generates checksums
-5. Creates GitHub release
-6. Verifies release integrity
-7. Publishes crate to crates.io
+3. Attests build provenance for each archive
+4. Creates git tag
+5. Generates checksums (attested as well)
+6. Creates GitHub release
+7. Verifies release integrity and attestations
+8. Publishes crate to crates.io
 
 ## Step by step
 

@@ -15,6 +15,18 @@ cargo install whoseportisitanyway
 
 Or download a prebuilt binary from the [releases page](https://github.com/z19r/whoseportisitanyway/releases).
 
+Every release archive is built in GitHub Actions and signed with a [build provenance
+attestation](https://docs.github.com/actions/security-guides/using-artifact-attestations-to-establish-provenance-for-builds).
+Verify a download before you run it:
+
+```bash
+gh attestation verify whoseportisitanyway-x86_64-unknown-linux-gnu.tar.gz \
+  --repo z19r/whoseportisitanyway
+```
+
+`SHA256SUMS.txt` is attested too, so you can verify it once and then check the
+archives against it with `sha256sum -c`.
+
 Both `whoseportisitanyway` and the shorter `whose-port` are installed as aliases for the same binary — use whichever you'd rather type.
 
 ## Usage
